@@ -105,7 +105,7 @@ private class ShaderRenderer(
         )
 
         try {
-            val vertexSource = readShaderAsset("shaders/lesson_01_passthrough.vert")
+            val vertexSource = readShaderAsset("main.vert")
             // 首页选中的资源只替换片元 Shader，顶点与纹理链保持一致。
             val fragmentSource = readShaderAsset(fragmentShaderAsset)
             program = createProgram(vertexSource, fragmentSource)

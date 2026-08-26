@@ -22,13 +22,15 @@ class MainActivity : ComponentActivity() {
             standaloneItems = ShaderDemoCatalog.standaloneItems,
             groups = ShaderDemoCatalog.groups,
         ) { demo ->
-            // 只传资源路径、展示标题和初始美白值，渲染页继续复用同一套 OpenGL 管线。
+            // 只传资源路径、展示标题和当前分类允许的控件，渲染页继续复用同一套 OpenGL 管线。
             startActivity(
                 ShaderDemoActivity.createIntent(
                     context = this,
                     fragmentShaderAsset = demo.fragmentShaderAsset,
                     demoTitle = getString(demo.titleRes),
                     initialWhitenStrength = demo.initialWhitenStrength,
+                    showWhitenStrengthControl = demo.showWhitenStrengthControl,
+                    showBlurStrengthControl = demo.showBlurStrengthControl,
                 ),
             )
         }

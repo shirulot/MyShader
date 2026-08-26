@@ -14,6 +14,10 @@
     <string name="shader_demo_whiten_strength_content_description">美白混白值，范围 0.00 到 1.00</string>
     <string name="shader_demo_blur_strength_label">磨皮强度：%1$.2f</string>
     <string name="shader_demo_blur_strength_content_description">磨皮强度，范围 0.00 到 1.00</string>
+    <string name="shader_demo_controls_collapse">收起 ▼</string>
+    <string name="shader_demo_controls_expand">展开 ▲</string>
+    <string name="shader_demo_controls_collapse_content_description">收起底部控制面板</string>
+    <string name="shader_demo_controls_expand_content_description">展开底部控制面板</string>
     <string name="shader_demo_group_expand">展开</string>
     <string name="shader_demo_group_collapse">收起</string>
     <string name="shader_demo_group_pending">待添加</string>
@@ -58,6 +62,7 @@
     <string name="demo_16_description">以九点邻域平滑肤色，并根据边缘差异保护局部轮廓。</string>
     <string name="demo_17_title">Demo 17 · 双边滤波磨皮</string>
     <string name="demo_17_description">按局部色差分配八方向采样权重，保留差异较大的细节。</string>
+    <string name="demo_group_basics">基础</string>
     <string name="demo_group_whitening">美白</string>
     <string name="demo_group_skin_smoothing">磨皮</string>
     <string name="demo_group_local_color_difference_debug">局部色差调试</string>

@@ -24,6 +24,8 @@ import androidx.core.view.WindowInsetsCompat
 class ShaderDemoActivity : ComponentActivity() {
     private lateinit var shaderSurfaceView: ShaderSurfaceView
     private lateinit var statusText: TextView
+    private lateinit var controlPanel: LinearLayout
+    private lateinit var expandControlsButton: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,6 +46,14 @@ class ShaderDemoActivity : ComponentActivity() {
             EXTRA_INITIAL_WHITEN_STRENGTH,
             DEFAULT_WHITEN_STRENGTH,
         )
+        val showWhitenStrengthControl = intent.getBooleanExtra(
+            EXTRA_SHOW_WHITEN_STRENGTH_CONTROL,
+            false,
+        )
+        val showBlurStrengthControl = intent.getBooleanExtra(
+            EXTRA_SHOW_BLUR_STRENGTH_CONTROL,
+            false,
+        )
 
         shaderSurfaceView = ShaderSurfaceView(this, fragmentShaderAsset) { message ->
             // GLSurfaceView 的回调运行在 GL 线程，状态文字必须切回主线程更新。
@@ -53,7 +63,7 @@ class ShaderDemoActivity : ComponentActivity() {
                 }
             }
         }
-        // 所有页面都显示两个控件；Shader 未声明对应 uniform 时渲染器会保持原画面。
+        // 不展示的控件仍使用默认 0.00，避免改变基础或原图直通的默认画面。
         shaderSurfaceView.setWhitenStrength(initialWhitenStrength)
         shaderSurfaceView.setBlurStrength(DEFAULT_BLUR_STRENGTH)
 
@@ -70,7 +80,7 @@ class ShaderDemoActivity : ComponentActivity() {
 
         val panelHorizontalPadding = dp(16)
         val panelVerticalPadding = dp(12)
-        val panel = LinearLayout(this).apply {
+        controlPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(
                 panelHorizontalPadding,
@@ -79,17 +89,32 @@ class ShaderDemoActivity : ComponentActivity() {
                 panelVerticalPadding,
             )
             setBackgroundColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_panel))
-            addView(TextView(this@ShaderDemoActivity).apply {
-                setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
-                text = getString(R.string.shader_demo_title_format, demoTitle)
-                textSize = 17f
+            addView(LinearLayout(this@ShaderDemoActivity).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(TextView(this@ShaderDemoActivity).apply {
+                    setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
+                    text = getString(R.string.shader_demo_title_format, demoTitle)
+                    textSize = 17f
+                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                addView(TextView(this@ShaderDemoActivity).apply {
+                    setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
+                    setText(R.string.shader_demo_controls_collapse)
+                    textSize = 13f
+                    contentDescription = getString(R.string.shader_demo_controls_collapse_content_description)
+                    setPadding(dp(12), dp(8), 0, dp(8))
+                    setOnClickListener { collapseControls() }
+                })
             })
             addView(statusText)
             addSourceImageControl(this)
-            addWhitenStrengthControl(this, initialWhitenStrength)
-            addBlurStrengthControl(this)
+            if (showWhitenStrengthControl) {
+                addWhitenStrengthControl(this, initialWhitenStrength)
+            }
+            if (showBlurStrengthControl) {
+                addBlurStrengthControl(this)
+            }
         }
-        ViewCompat.setOnApplyWindowInsetsListener(panel) { view, windowInsets ->
+        ViewCompat.setOnApplyWindowInsetsListener(controlPanel) { view, windowInsets ->
             val navigationBarInsets = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars())
             // 保留面板原有间距，并把交互内容抬到三键导航或手势条的安全区域内。
             view.setPadding(
@@ -101,13 +126,43 @@ class ShaderDemoActivity : ComponentActivity() {
             windowInsets
         }
         root.addView(
-            panel,
+            controlPanel,
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM,
             ),
         )
+        // 面板收起后，只在底部保留展开入口，完整控制内容不再覆盖测试图片。
+        expandControlsButton = TextView(this).apply {
+            setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
+            setBackgroundColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_panel))
+            setText(R.string.shader_demo_controls_expand)
+            textSize = 13f
+            gravity = Gravity.CENTER
+            contentDescription = getString(R.string.shader_demo_controls_expand_content_description)
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            visibility = android.view.View.GONE
+            setOnClickListener { expandControls() }
+        }
+        root.addView(
+            expandControlsButton,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,
+            ).apply {
+                bottomMargin = dp(12)
+            },
+        )
+        ViewCompat.setOnApplyWindowInsetsListener(expandControlsButton) { view, windowInsets ->
+            val navigationBarInsets = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            (view.layoutParams as FrameLayout.LayoutParams).apply {
+                bottomMargin = dp(12) + navigationBarInsets.bottom
+                view.layoutParams = this
+            }
+            windowInsets
+        }
 
         setContentView(root)
     }
@@ -126,6 +181,53 @@ class ShaderDemoActivity : ComponentActivity() {
         // 让 GPU 资源在 GL 线程释放，避免 Activity 退出时留下纹理和 Program。
         shaderSurfaceView.release()
         super.onDestroy()
+    }
+
+    /** 让完整面板下滑出屏，收起后不再覆盖测试图片。 */
+    private fun collapseControls() {
+        controlPanel.animate().cancel()
+        expandControlsButton.animate().cancel()
+        controlPanel.animate()
+            .translationY(controlPanel.height.toFloat())
+            .setDuration(CONTROL_PANEL_ANIMATION_DURATION_MS)
+            .withEndAction {
+                // INVISIBLE 保留已测量高度，展开时可以从底部稳定地上滑回来。
+                controlPanel.visibility = android.view.View.INVISIBLE
+                controlPanel.translationY = 0f
+                expandControlsButton.apply {
+                    alpha = 0f
+                    translationY = dp(EXPAND_BUTTON_ENTER_OFFSET_DP).toFloat()
+                    visibility = android.view.View.VISIBLE
+                    animate()
+                        .alpha(1f)
+                        .translationY(0f)
+                        .setDuration(CONTROL_PANEL_ANIMATION_DURATION_MS)
+                        .start()
+                }
+            }
+            .start()
+    }
+
+    /** 隐藏底部入口，并让完整面板从屏幕底部上滑回来。 */
+    private fun expandControls() {
+        controlPanel.animate().cancel()
+        expandControlsButton.animate().cancel()
+        expandControlsButton.animate()
+            .alpha(0f)
+            .translationY(dp(EXPAND_BUTTON_ENTER_OFFSET_DP).toFloat())
+            .setDuration(CONTROL_PANEL_ANIMATION_DURATION_MS)
+            .withEndAction {
+                expandControlsButton.visibility = android.view.View.GONE
+                controlPanel.apply {
+                    translationY = height.toFloat()
+                    visibility = android.view.View.VISIBLE
+                    animate()
+                        .translationY(0f)
+                        .setDuration(CONTROL_PANEL_ANIMATION_DURATION_MS)
+                        .start()
+                }
+            }
+            .start()
     }
 
     private fun dp(value: Int): Int =
@@ -271,7 +373,9 @@ class ShaderDemoActivity : ComponentActivity() {
         private const val EXTRA_FRAGMENT_SHADER_ASSET = "fragment_shader_asset"
         private const val EXTRA_DEMO_TITLE = "demo_title"
         private const val EXTRA_INITIAL_WHITEN_STRENGTH = "initial_whiten_strength"
-        private const val DEFAULT_FRAGMENT_SHADER_ASSET = "shaders/lesson_01_passthrough.frag"
+        private const val EXTRA_SHOW_WHITEN_STRENGTH_CONTROL = "show_whiten_strength_control"
+        private const val EXTRA_SHOW_BLUR_STRENGTH_CONTROL = "show_blur_strength_control"
+        private const val DEFAULT_FRAGMENT_SHADER_ASSET = "main.frag"
         private const val WHITEN_STRENGTH_MIN = 0f
         private const val WHITEN_STRENGTH_MAX = 1f
         private const val WHITEN_STRENGTH_STEP = 0.01f
@@ -283,6 +387,8 @@ class ShaderDemoActivity : ComponentActivity() {
         private const val BLUR_STRENGTH_PROGRESS_MAX = 100
         private const val BLUR_STRENGTH_DEFAULT_PROGRESS = 0
         private const val DEFAULT_BLUR_STRENGTH = 0f
+        private const val CONTROL_PANEL_ANIMATION_DURATION_MS = 220L
+        private const val EXPAND_BUTTON_ENTER_OFFSET_DP = 12
 
         /** 统一构造跳转参数，避免调用方拼错 Intent extra。 */
         fun createIntent(
@@ -290,10 +396,14 @@ class ShaderDemoActivity : ComponentActivity() {
             fragmentShaderAsset: String,
             demoTitle: String,
             initialWhitenStrength: Float,
+            showWhitenStrengthControl: Boolean,
+            showBlurStrengthControl: Boolean,
         ): Intent = Intent(context, ShaderDemoActivity::class.java).apply {
             putExtra(EXTRA_FRAGMENT_SHADER_ASSET, fragmentShaderAsset)
             putExtra(EXTRA_DEMO_TITLE, demoTitle)
             putExtra(EXTRA_INITIAL_WHITEN_STRENGTH, initialWhitenStrength)
+            putExtra(EXTRA_SHOW_WHITEN_STRENGTH_CONTROL, showWhitenStrengthControl)
+            putExtra(EXTRA_SHOW_BLUR_STRENGTH_CONTROL, showBlurStrengthControl)
         }
     }
 }
