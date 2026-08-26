@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.MyShader" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- 由窗口直接绘制首页底色，避免根布局重复覆盖产生 overdraw。 -->
+        <item name="android:windowBackground">@color/shader_home_background</item>
+    </style>
+</resources>

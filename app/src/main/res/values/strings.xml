@@ -1,0 +1,64 @@
+<resources>
+    <string name="app_name">MyShader</string>
+    <string name="shader_home_title">MyShader</string>
+    <string name="shader_home_subtitle">选择一个独立 GLSL Shader Demo</string>
+    <string name="shader_demo_title_format">Shader Demo · %1$s</string>
+    <string name="shader_demo_status_loading">正在加载独立 Shader 文件…</string>
+    <string name="shader_demo_status_ready">Shader 已加载：%1$s</string>
+    <string name="shader_demo_status_error">Shader 初始化失败：%1$s</string>
+    <string name="shader_demo_status_interface_error">Shader 接口不匹配：请保留 position、inputTextureCoordinate、inputImageTexture。</string>
+    <string name="shader_demo_source_image_label">测试图片</string>
+    <string name="shader_demo_source_image_original">原练习图</string>
+    <string name="shader_demo_source_image_detail">新的人像</string>
+    <string name="shader_demo_whiten_strength_label">美白混白值：%1$.2f</string>
+    <string name="shader_demo_whiten_strength_content_description">美白混白值，范围 0.00 到 1.00</string>
+    <string name="shader_demo_blur_strength_label">磨皮强度：%1$.2f</string>
+    <string name="shader_demo_blur_strength_content_description">磨皮强度，范围 0.00 到 1.00</string>
+    <string name="shader_demo_group_expand">展开</string>
+    <string name="shader_demo_group_collapse">收起</string>
+    <string name="shader_demo_group_pending">待添加</string>
+    <string name="shader_demo_group_content_description">%1$s，%2$s</string>
+    <plurals name="shader_demo_group_count">
+        <item quantity="other">%1$d 个 Demo</item>
+    </plurals>
+
+    <string name="demo_passthrough_title">原图直通</string>
+    <string name="demo_passthrough_description">不修改采样颜色，作为其他 Demo 的对照基线。</string>
+    <string name="demo_01_title">Demo 1 · 固定红色</string>
+    <string name="demo_01_description">保留原图透明度，将每个片元的 RGB 输出为红色。</string>
+    <string name="demo_02_title">Demo 2 · UV 红绿渐变</string>
+    <string name="demo_02_description">把横向 UV 映射到红色、纵向 UV 映射到绿色。</string>
+    <string name="demo_03_title">Demo 3 · 采样坐标偏移</string>
+    <string name="demo_03_description">横向采样坐标增加 0.1，观察图像移动和边缘重复。</string>
+    <string name="demo_04_title">Demo 4 · 整体变暗</string>
+    <string name="demo_04_description">RGB 乘以 0.5，透明度保持不变。</string>
+    <string name="demo_05_title">Demo 5 · 整体提亮</string>
+    <string name="demo_05_description">RGB 乘以 1.2，并把结果限制在 1.0 以内。</string>
+    <string name="demo_06_title">Demo 6 · 右半屏混白</string>
+    <string name="demo_06_description">右半屏统一混入 15% 白色，展示非肤色识别式处理。</string>
+    <string name="demo_07_title">Demo 7 · 条件混白</string>
+    <string name="demo_07_description">仅在右半屏且满足简单肤色条件时混入白色。</string>
+    <string name="demo_08_title">Demo 8 · 左右效果对比</string>
+    <string name="demo_08_description">左右各显示一张完整人脸，右侧应用条件混白。</string>
+    <string name="demo_09_title">Demo 9 · 黑白 Mask</string>
+    <string name="demo_09_description">左侧保留原图，右侧用黑白显示暖色条件选中的像素。</string>
+    <string name="demo_10_title">Demo 10 · 连续权重 Mask</string>
+    <string name="demo_10_description">使用 smoothstep 计算连续肤色权重，并按权重混入白色。</string>
+    <string name="demo_11_title">Demo 11 · 两点横向柔化</string>
+    <string name="demo_11_description">右半屏平均当前像素与右侧邻居，观察最小邻域采样。</string>
+    <string name="demo_12_title">Demo 12 · 三点横向柔化</string>
+    <string name="demo_12_description" formatted="false">右半屏以 60%、20%、20% 混合左中右三个像素。</string>
+    <string name="demo_13_title">Demo 13 · 肤色权重磨皮</string>
+    <string name="demo_13_description">在三点平滑基础上，用连续肤色权重控制右半屏混合。</string>
+    <string name="demo_14_title">Demo 14 · 边缘保护磨皮</string>
+    <string name="demo_14_description">根据原色与平滑色差异降低模糊强度，保护局部轮廓。</string>
+    <string name="demo_15_title">Demo 15 · 九点边缘保护磨皮</string>
+    <string name="demo_15_description">以九点邻域平滑肤色，并根据边缘差异保护局部轮廓。</string>
+    <string name="demo_16_title">Demo 16 · 九点边缘保护磨皮</string>
+    <string name="demo_16_description">以九点邻域平滑肤色，并根据边缘差异保护局部轮廓。</string>
+    <string name="demo_17_title">Demo 17 · 双边滤波磨皮</string>
+    <string name="demo_17_description">按局部色差分配八方向采样权重，保留差异较大的细节。</string>
+    <string name="demo_group_whitening">美白</string>
+    <string name="demo_group_skin_smoothing">磨皮</string>
+    <string name="demo_group_local_color_difference_debug">局部色差调试</string>
+</resources>
