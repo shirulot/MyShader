@@ -1,7 +1,6 @@
 precision mediump float;
 uniform sampler2D inputImageTexture;
 uniform float blurStrength;
-uniform float warmthStrength;
 varying vec2 textureCoordinate;
 // 当前处理的中心色
 vec4 centerColor;
@@ -35,10 +34,8 @@ void main() {
 
     // 只由磨皮强度控制原色与局部颜色基准的混合。
     vec3 smoothedRgb = mix(centerColor.rgb, localBaseRgb, blurWeight);
-    // 限制大小
-    float warmth = clamp(warmthStrength,0.0,3.0);
     // 红色增量大于绿色增量，形成轻微暖色方向。
-    vec3 warmOffset = createWarmToneOffset(0.03 * warmth);
+    vec3 warmOffset = createWarmToneOffset(0.03);
     // 只让皮肤候选且非明显细节区域获得暖色。
     float warmthWeight = skinWeight * (1.0 - edgeProtection);
     // 在磨皮结果上叠加受遮罩限制的暖色。

@@ -1,20 +1,14 @@
 package com.shirulot.myshader
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Color
-import android.opengl.GLES20
-import android.opengl.GLSurfaceView
-import android.opengl.GLUtils
+import android.graphics.*
+import android.opengl.*
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import androidx.core.content.ContextCompat
 import androidx.annotation.DrawableRes
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.nio.FloatBuffer
+import androidx.core.content.ContextCompat
+import java.nio.*
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -56,10 +50,17 @@ class ShaderSurfaceView(
         queueEvent { shaderRenderer.setWhitenStrength(value) }
     }
 
+
+    fun setWarmthStrength(value: Float) {
+        // SeekBar 回调来自主线程，uniform 状态必须在 GL 线程更新。
+        queueEvent { shaderRenderer.setWarmthStrength(value) }
+    }
+
     fun setSourceImage(@DrawableRes sourceImageRes: Int) {
         // 切换图片会创建和删除 OpenGL 纹理，因此同样只能在 GL 线程执行。
         queueEvent { shaderRenderer.setSourceImage(sourceImageRes) }
     }
+
 }
 
 private class ShaderRenderer(
@@ -90,9 +91,12 @@ private class ShaderRenderer(
     private var image: Bitmap? = null
     private var surfaceWidth = 0
     private var surfaceHeight = 0
+
     @DrawableRes
     private var sourceImageRes = R.drawable.lesson_face
     private var whitenStrength = DEFAULT_WHITEN_STRENGTH
+
+    private var warmthStrength = DEFAULT_WARMTH_STRENGTH
     private var blurStrength = DEFAULT_BLUR_STRENGTH
 
     override fun onSurfaceCreated(unused: GL10?, config: EGLConfig?) {
@@ -152,6 +156,7 @@ private class ShaderRenderer(
         val textureLocation = GLES20.glGetUniformLocation(program, "inputImageTexture")
         val whitenStrengthLocation = GLES20.glGetUniformLocation(program, "whitenStrength")
         val blurStrengthLocation = GLES20.glGetUniformLocation(program, "blurStrength")
+        val warmthStrengthLocation = GLES20.glGetUniformLocation(program, "warmthStrength")
         if (positionLocation < 0 || textureCoordinateLocation < 0 || textureLocation < 0) {
             postStatus(context.getString(R.string.shader_demo_status_interface_error))
             return
@@ -186,12 +191,17 @@ private class ShaderRenderer(
         if (whitenStrengthLocation >= 0) {
             GLES20.glUniform1f(whitenStrengthLocation, whitenStrength)
         }
-        // 只有 Demo 14 声明 blurStrength；其他 Shader 返回 -1，保持原有行为。
+        // 只有磨皮声明 blurStrength；其他 Shader 返回 -1，保持原有行为。
         if (blurStrengthLocation >= 0) {
             GLES20.glUniform1f(blurStrengthLocation, blurStrength)
         }
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
 
+        // 只有声明 warmthStrength 的 Shader 才接收暖色强度。
+        if (warmthStrengthLocation >= 0) {
+            GLES20.glUniform1f(warmthStrengthLocation, warmthStrength)
+        }
+
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
         GLES20.glDisableVertexAttribArray(positionLocation)
         GLES20.glDisableVertexAttribArray(textureCoordinateLocation)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0)
@@ -216,6 +226,10 @@ private class ShaderRenderer(
 
     fun setWhitenStrength(value: Float) {
         whitenStrength = value.coerceIn(MIN_WHITEN_STRENGTH, MAX_WHITEN_STRENGTH)
+    }
+
+    fun setWarmthStrength(value: Float) {
+        warmthStrength = value.coerceIn(MIN_WARMTH_STRENGTH, MAX_WARMTH_STRENGTH)
     }
 
     fun setSourceImage(@DrawableRes resourceId: Int) {
@@ -373,6 +387,10 @@ private class ShaderRenderer(
         const val DEFAULT_WHITEN_STRENGTH = 0f
         const val MIN_WHITEN_STRENGTH = 0f
         const val MAX_WHITEN_STRENGTH = 1f
+
+        const val DEFAULT_WARMTH_STRENGTH = 0f
+        const val MIN_WARMTH_STRENGTH = 0f
+        const val MAX_WARMTH_STRENGTH = 3f
         const val DEFAULT_BLUR_STRENGTH = 0f
         const val MIN_BLUR_STRENGTH = 0f
         const val MAX_BLUR_STRENGTH = 1f

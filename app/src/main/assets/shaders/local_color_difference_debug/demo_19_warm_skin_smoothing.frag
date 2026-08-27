@@ -1,15 +1,12 @@
 precision mediump float;
 uniform sampler2D inputImageTexture;
 uniform float blurStrength;
-uniform float warmthStrength;
 varying vec2 textureCoordinate;
 // 当前处理的中心色
 vec4 centerColor;
 float scale = 3.0;
 
 vec3 calculateBilateralAverageRgb(float scale);
-vec3 createWarmToneOffset(float warmth);
-float getSkinWeight();
 
 void main() {
     // 原图直通：采样结果不做任何颜色处理。
@@ -22,8 +19,12 @@ void main() {
     vec3 averageRgb = calculateBilateralAverageRgb(scale);
     // 当前像素周围的局部颜色基准。
     vec3 localBaseRgb = averageRgb;
+    // 红蓝差对应的皮肤权重。
+    float redBlueWeight = smoothstep(0.04, 0.16, centerColor.r - centerColor.b);
+    // 红绿差对应的皮肤权重。
+    float redGreenWeight = smoothstep(0.00, 0.08, centerColor.r - centerColor.g);
     // 两项条件共同限制皮肤权重。
-    float skinWeight = getSkinWeight();
+    float skinWeight = min(redBlueWeight, redGreenWeight);
     // 原色与模糊色差距代表边缘强度。
     float edgeStrength = length(centerColor.rgb - averageRgb);
     // 明显边缘得到更高保护权重。
@@ -33,21 +34,11 @@ void main() {
     // 得到最终局部磨皮比例。
     float blurWeight = skinWeight * (1.0 - edgeProtection) * strengthWeight;
 
-    // 只由磨皮强度控制原色与局部颜色基准的混合。
-    vec3 smoothedRgb = mix(centerColor.rgb, localBaseRgb, blurWeight);
-    // 限制大小
-    float warmth = clamp(warmthStrength,0.0,3.0);
-    // 红色增量大于绿色增量，形成轻微暖色方向。
-    vec3 warmOffset = createWarmToneOffset(0.03 * warmth);
-    // 只让皮肤候选且非明显细节区域获得暖色。
-    float warmthWeight = skinWeight * (1.0 - edgeProtection);
-    // 在磨皮结果上叠加受遮罩限制的暖色。
-    vec3 resultRgb = min(smoothedRgb + warmOffset * warmthWeight, vec3(1.0));
 
-    //    // 当前色加入暖色
-    //    vec3 targetSkin = min(localBaseRgb + createWarmToneOffset(0.08), vec3(1.0));
-    //    // 混合原色与平滑后的颜色。
-    //    vec3 resultRgb = mix(centerColor.rgb, targetSkin, blurWeight);
+    // 当前色加入暖色
+    vec3 targetSkin = min(localBaseRgb + vec3(0.08, 0.03, 0), vec3(1.0));
+    // 混合原色与平滑后的颜色。
+    vec3 resultRgb = mix(centerColor.rgb, targetSkin, blurWeight);
 
 
     // 左侧显示磨皮结果。
@@ -63,21 +54,6 @@ void main() {
         // 右侧显示原图。
         gl_FragColor = centerColor;
     }
-}
-
-// 获取肤色权重
-float getSkinWeight(){
-    // 红蓝差对应的皮肤权重。
-    float redBlueWeight = smoothstep(0.04, 0.16, centerColor.r - centerColor.b);
-    // 红绿差对应的皮肤权重。
-    float redGreenWeight = smoothstep(0.00, 0.08, centerColor.r - centerColor.g);
-    // 两项条件共同限制皮肤权重。
-    return min(redBlueWeight, redGreenWeight);
-}
-
-// 暖色调值
-vec3 createWarmToneOffset(float warmth){
-    return vec3(warmth, warmth * 0.35, 0.0);
 }
 
 // 计算和当前色的色差

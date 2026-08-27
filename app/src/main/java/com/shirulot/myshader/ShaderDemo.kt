@@ -12,6 +12,8 @@ data class ShaderDemo(
     // 滑条展示由课程分组决定；渲染器仍会安全忽略未声明的 uniform。
     val showWhitenStrengthControl: Boolean = false,
     val showBlurStrengthControl: Boolean = false,
+    // 暖色滑条控制 Shader 的 warmthStrength uniform。
+    val showWarmthStrengthControl: Boolean = false,
 )
 
 /** 一组可展开/收起的 Shader Demo。 */
@@ -24,7 +26,14 @@ data class ShaderDemoGroup(
 /** 集中维护 Demo 顺序，避免首页和渲染页各自保存一份映射。 */
 object ShaderDemoCatalog {
     val standaloneItems: List<ShaderDemo> = listOf(
-        ShaderDemo(R.string.demo_passthrough_title, R.string.demo_passthrough_description, "main.frag"),
+        // main.frag 当前练习使用 blurStrength，因此独立入口展示磨皮滑条。
+        ShaderDemo(
+            R.string.demo_passthrough_title,
+            R.string.demo_passthrough_description,
+            "main.frag",
+            showBlurStrengthControl = true,
+            showWarmthStrengthControl = true,
+        ),
     )
 
     val groups: List<ShaderDemoGroup> = listOf(
@@ -63,7 +72,13 @@ object ShaderDemoCatalog {
         ),
         ShaderDemoGroup(
             titleRes = R.string.demo_group_local_color_difference_debug,
-            demos = emptyList(),
+            demos = listOf(
+                // 此 Demo 直接输出局部色差灰度图，调试结果不使用磨皮混合值。
+                ShaderDemo(R.string.demo_18_title, R.string.demo_18_description, "shaders/local_color_difference_debug/demo_18_edge_difference_debug.frag"),
+                ShaderDemo(R.string.demo_19_title, R.string.demo_19_description, "shaders/local_color_difference_debug/demo_19_warm_skin_smoothing.frag"),
+                ShaderDemo(R.string.demo_20_title, R.string.demo_20_description, "shaders/local_color_difference_debug/demo_20_local_warm_tone_debug.frag"),
+                ShaderDemo(R.string.demo_21_title, R.string.demo_21_description, "shaders/local_color_difference_debug/demo_21_warmth_strength_uniform.frag"),
+            ),
             initiallyExpanded = false,
         ),
     )

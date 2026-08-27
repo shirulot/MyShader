@@ -14,6 +14,8 @@
     <string name="shader_demo_whiten_strength_content_description">美白混白值，范围 0.00 到 1.00</string>
     <string name="shader_demo_blur_strength_label">磨皮强度：%1$.2f</string>
     <string name="shader_demo_blur_strength_content_description">磨皮强度，范围 0.00 到 1.00</string>
+    <string name="shader_demo_warmth_strength_label">暖色强度：%1$.2f</string>
+    <string name="shader_demo_warmth_strength_content_description">暖色强度，范围 0.00 到 3.00</string>
     <string name="shader_demo_controls_collapse">收起 ▼</string>
     <string name="shader_demo_controls_expand">展开 ▲</string>
     <string name="shader_demo_controls_collapse_content_description">收起底部控制面板</string>
@@ -62,6 +64,14 @@
     <string name="demo_16_description">以九点邻域平滑肤色，并根据边缘差异保护局部轮廓。</string>
     <string name="demo_17_title">Demo 17 · 双边滤波磨皮</string>
     <string name="demo_17_description">按局部色差分配八方向采样权重，保留差异较大的细节。</string>
+    <string name="demo_18_title">Demo 18 · 局部色差灰度图</string>
+    <string name="demo_18_description">左侧放大显示原色与双边平滑色的局部色差，右侧保留原图。</string>
+    <string name="demo_19_title">Demo 19 · 暖色磨皮</string>
+    <string name="demo_19_description">左侧将双边平滑色微调为暖色后按肤色与边缘权重混合，右侧保留原图。</string>
+    <string name="demo_20_title">Demo 20 · 局部暖色调试</string>
+    <string name="demo_20_description">根据肤色与边缘遮罩，只在局部平滑结果上叠加轻微暖色，右侧保留原图。</string>
+    <string name="demo_21_title">Demo 21 · 暖色强度参数</string>
+    <string name="demo_21_description">通过 warmthStrength 参数限制局部暖色偏移，右侧保留原图。</string>
     <string name="demo_group_basics">基础</string>
     <string name="demo_group_whitening">美白</string>
     <string name="demo_group_skin_smoothing">磨皮</string>

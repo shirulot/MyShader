@@ -54,6 +54,10 @@ class ShaderDemoActivity : ComponentActivity() {
             EXTRA_SHOW_BLUR_STRENGTH_CONTROL,
             false,
         )
+        val showWarmthStrengthControl = intent.getBooleanExtra(
+            EXTRA_SHOW_WARMTH_STRENGTH_CONTROL,
+            false,
+        )
 
         shaderSurfaceView = ShaderSurfaceView(this, fragmentShaderAsset) { message ->
             // GLSurfaceView 的回调运行在 GL 线程，状态文字必须切回主线程更新。
@@ -112,6 +116,9 @@ class ShaderDemoActivity : ComponentActivity() {
             }
             if (showBlurStrengthControl) {
                 addBlurStrengthControl(this)
+            }
+            if (showWarmthStrengthControl) {
+                addWarmthStrengthControl(this)
             }
         }
         ViewCompat.setOnApplyWindowInsetsListener(controlPanel) { view, windowInsets ->
@@ -357,8 +364,52 @@ class ShaderDemoActivity : ComponentActivity() {
         )
     }
 
+    /** 暖色强度映射为 0.00 到 3.00，并上传给 Shader uniform。 */
+    private fun addWarmthStrengthControl(panel: LinearLayout) {
+        val strengthText = TextView(this).apply {
+            setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
+            textSize = 13f
+            text = getString(R.string.shader_demo_warmth_strength_label, DEFAULT_WARMTH_STRENGTH)
+        }
+        val strengthSeekBar = SeekBar(this).apply {
+            max = WARMTH_STRENGTH_PROGRESS_MAX
+            progress = WARMTH_STRENGTH_DEFAULT_PROGRESS
+            contentDescription = getString(R.string.shader_demo_warmth_strength_content_description)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                    val value = warmthStrengthFromProgress(progress)
+                    strengthText.text = getString(R.string.shader_demo_warmth_strength_label, value)
+                    // 将暖色强度上传给当前 Shader。
+                    shaderSurfaceView.setWarmthStrength(value)
+
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
+
+                override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
+            })
+        }
+        panel.addView(
+            strengthText,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(8) },
+        )
+        panel.addView(
+            strengthSeekBar,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+    }
+
     private fun blurStrengthFromProgress(progress: Int): Float =
         (BLUR_STRENGTH_MIN + progress * BLUR_STRENGTH_STEP).coerceAtMost(BLUR_STRENGTH_MAX)
+
+    private fun warmthStrengthFromProgress(progress: Int): Float =
+        (WARMTH_STRENGTH_MIN + progress * WARMTH_STRENGTH_STEP).coerceAtMost(WARMTH_STRENGTH_MAX)
 
     /** 将初始美白值映射为 SeekBar 进度，保证页面首次显示与 Shader 初值一致。 */
     private fun whitenStrengthToProgress(value: Float): Int =
@@ -375,6 +426,7 @@ class ShaderDemoActivity : ComponentActivity() {
         private const val EXTRA_INITIAL_WHITEN_STRENGTH = "initial_whiten_strength"
         private const val EXTRA_SHOW_WHITEN_STRENGTH_CONTROL = "show_whiten_strength_control"
         private const val EXTRA_SHOW_BLUR_STRENGTH_CONTROL = "show_blur_strength_control"
+        private const val EXTRA_SHOW_WARMTH_STRENGTH_CONTROL = "show_warmth_strength_control"
         private const val DEFAULT_FRAGMENT_SHADER_ASSET = "main.frag"
         private const val WHITEN_STRENGTH_MIN = 0f
         private const val WHITEN_STRENGTH_MAX = 1f
@@ -387,6 +439,12 @@ class ShaderDemoActivity : ComponentActivity() {
         private const val BLUR_STRENGTH_PROGRESS_MAX = 100
         private const val BLUR_STRENGTH_DEFAULT_PROGRESS = 0
         private const val DEFAULT_BLUR_STRENGTH = 0f
+        private const val WARMTH_STRENGTH_MIN = 0f
+        private const val WARMTH_STRENGTH_MAX = 3f
+        private const val WARMTH_STRENGTH_STEP = 0.03f
+        private const val WARMTH_STRENGTH_PROGRESS_MAX = 100
+        private const val WARMTH_STRENGTH_DEFAULT_PROGRESS = 0
+        private const val DEFAULT_WARMTH_STRENGTH = 0f
         private const val CONTROL_PANEL_ANIMATION_DURATION_MS = 220L
         private const val EXPAND_BUTTON_ENTER_OFFSET_DP = 12
 
@@ -398,12 +456,14 @@ class ShaderDemoActivity : ComponentActivity() {
             initialWhitenStrength: Float,
             showWhitenStrengthControl: Boolean,
             showBlurStrengthControl: Boolean,
+            showWarmthStrengthControl: Boolean,
         ): Intent = Intent(context, ShaderDemoActivity::class.java).apply {
             putExtra(EXTRA_FRAGMENT_SHADER_ASSET, fragmentShaderAsset)
             putExtra(EXTRA_DEMO_TITLE, demoTitle)
             putExtra(EXTRA_INITIAL_WHITEN_STRENGTH, initialWhitenStrength)
             putExtra(EXTRA_SHOW_WHITEN_STRENGTH_CONTROL, showWhitenStrengthControl)
             putExtra(EXTRA_SHOW_BLUR_STRENGTH_CONTROL, showBlurStrengthControl)
+            putExtra(EXTRA_SHOW_WARMTH_STRENGTH_CONTROL, showWarmthStrengthControl)
         }
     }
 }

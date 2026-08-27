@@ -18,9 +18,10 @@
 
 1. 首页按分组展示 Demo，组头默认收起。
 2. 进入任意 Demo 后，可以切换“原练习图”和“新的人像”。
-3. 基础组和原图直通不显示滑条；美白组只显示美白滑条；磨皮组只显示磨皮滑条。范围均为 `0.00–1.00`，默认值为 `0.00`。
+3. 基础组不显示滑条；美白组只显示美白滑条；磨皮组与当前 `main.frag` 入口只显示磨皮滑条。暖色滑条默认隐藏。范围均为 `0.00–1.00`，默认值为 `0.00`。
 4. 只有声明了 `whitenStrength` 或 `blurStrength` 的片元着色器会响应对应滑条；未声明时画面保持不变。
 5. 底部控制面板可收起；收起时面板下滑且测试图片不再被遮挡，点击底部“展开”后面板上滑恢复。
+6. 暖色滑条当前仅用于 UI 交互和数值展示，尚未传入 Shader，因此拖动不会改变画面。需要展示时，在 `ShaderDemoCatalog` 对应的 `ShaderDemo` 上添加 `showWarmthStrengthControl = true`。
 
 ## 练习内容
 
@@ -54,14 +55,17 @@
 
 ### 局部色差调试
 
-当前仅保留组头，后续 Demo 将继续添加到这里。
+- Demo 18：局部色差灰度图
+- Demo 19：暖色磨皮
+- Demo 20：局部暖色调试
+- Demo 21：暖色强度参数
 
 ## 目录说明
 
 ```text
 app/src/main/assets/main.frag   # 当前练习中的主片元 Shader
 app/src/main/assets/main.vert   # 共用主顶点 Shader
-app/src/main/assets/shaders/    # 按 basic、whitening、skin_smoothing 分类的 Demo
+app/src/main/assets/shaders/    # 按 basic、whitening、skin_smoothing、local_color_difference_debug 分类的 Demo
 app/src/main/java/.../          # Android 页面、列表与 OpenGL 渲染器
 app/src/main/res/drawable-nodpi # 两张本地测试人像
 ```
