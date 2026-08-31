@@ -390,7 +390,7 @@ private class ShaderRenderer(
 
         const val DEFAULT_WARMTH_STRENGTH = 0f
         const val MIN_WARMTH_STRENGTH = 0f
-        const val MAX_WARMTH_STRENGTH = 3f
+        const val MAX_WARMTH_STRENGTH = 1f
         const val DEFAULT_BLUR_STRENGTH = 0f
         const val MIN_BLUR_STRENGTH = 0f
         const val MAX_BLUR_STRENGTH = 1f

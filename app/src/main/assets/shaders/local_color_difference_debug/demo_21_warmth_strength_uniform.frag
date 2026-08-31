@@ -36,7 +36,7 @@ void main() {
     // 只由磨皮强度控制原色与局部颜色基准的混合。
     vec3 smoothedRgb = mix(centerColor.rgb, localBaseRgb, blurWeight);
     // 限制大小
-    float warmth = clamp(warmthStrength,0.0,3.0);
+    float warmth = clamp(warmthStrength, 0.0, 1.0);
     // 红色增量大于绿色增量，形成轻微暖色方向。
     vec3 warmOffset = createWarmToneOffset(0.03 * warmth);
     // 只让皮肤候选且非明显细节区域获得暖色。

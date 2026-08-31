@@ -21,9 +21,8 @@ float SHADOW_START = 0.1;
 float SHADOW_END = 0.3;
 
 // 饱和度保护
-// HSV 饱和度保护：0.55 开始保护，0.85 完全停止额外增饱和。
-float SATURATION_START = 0.55;
-float SATURATION_END = 0.85;
+float SATURATION_START = 0.16;
+float SATURATION_END = 0.32;
 
 // 边缘保护
 float EDGE_START = 0.03;
@@ -91,23 +90,13 @@ void main() {
     float smoothedLuminance = dot(smoothedRgb, lightRec709);
     // 去掉灰度亮度后，剩余部分就是当前颜色的色度偏移。
     vec3 smoothedChroma = smoothedRgb - vec3(smoothedLuminance);
-//    // 色度偏移的长度表示当前像素本身有多鲜艳。 当前离灰色有多远越大越鲜艳
-//    float chromaStrength = length(smoothedChroma);
-//    // 色度低于 0.16 不保护；0.16 到 0.32 逐渐停止额外增饱和。
-//    // 所以实际起到一个鲜艳色保护以及灰色保护的作用 也就是饱和度保护
-//    float saturationProtection = 1.0 - smoothstep(SATURATION_START, SATURATION_END, chromaStrength);
-
-    // HSV S-饱和度的最大 RGB 通道。
-    float maxChannel = max(smoothedRgb.r, max(smoothedRgb.g, smoothedRgb.b));
-    // HSV S-饱和度的最小 RGB 通道。
-    float minChannel = min(smoothedRgb.r, min(smoothedRgb.g, smoothedRgb.b));
-    // 用最大通道保护除零，得到范围为 0 到 1 的 HSV 饱和度。
-    float hsvSaturation = (maxChannel - minChannel) / max(maxChannel, 0.0001);
-    // HSV 饱和度从 0.55 开始保护，到 0.85 时停止额外增饱和。还被允许增加多少饱和
-    float saturationAllowance = 1.0 - smoothstep(SATURATION_START, SATURATION_END, hsvSaturation);
-
+    // 色度偏移的长度表示当前像素本身有多鲜艳。 当前离灰色有多远越大越鲜艳
+    float chromaStrength = length(smoothedChroma);
+    // 色度低于 0.16 不保护；0.16 到 0.32 逐渐停止额外增饱和。
+    // 所以实际起到一个鲜艳色保护以及灰色保护的作用 也就是饱和度保护
+    float saturationProtection = 1.0 - smoothstep(SATURATION_START, SATURATION_END, chromaStrength);
     // 最终色度增强权重同时受补暖范围和高饱和保护限制。
-    float saturationWeight = warmthWeight * saturationAllowance;
+    float saturationWeight = warmthWeight * saturationProtection;
     // 仅在最终允许区域放大色度；0.12 表示最高额外增加 12%。
     vec3 saturatedRgb = vec3(smoothedLuminance) + smoothedChroma * (1.0 + 0.12 * saturationWeight);
     // 在色度增强结果上继续叠加原有的暖色色度偏移。
@@ -116,12 +105,12 @@ void main() {
 
     // 每半屏按 y 再分为两条横带，便于同时观察四种输出。
     // step 阈值方法 param 2 < param 1 则返回0 否则 1
-    //    float band = step(0.5, textureCoordinate.y);
-    //    // 将最终色度增强权重绘制为灰度图，白色表示可完整增饱和。
-    //    vec3 saturationDebug = vec3(saturationWeight);
-    //    // 实际以下三行不做mix因为step只会有 0或者1 这里就是一个if else
-    //    vec4 debugColor = mix(vec4(saturationDebug, centerColor.a), vec4(vec3(luminance), centerColor.a), band);
-    //    vec4 compareColor = mix(vec4(resultRgb, centerColor.a), centerColor, band);
+//    float band = step(0.5, textureCoordinate.y);
+//    // 将最终色度增强权重绘制为灰度图，白色表示可完整增饱和。
+//    vec3 saturationDebug = vec3(saturationWeight);
+//    // 实际以下三行不做mix因为step只会有 0或者1 这里就是一个if else
+//    vec4 debugColor = mix(vec4(saturationDebug, centerColor.a), vec4(vec3(luminance), centerColor.a), band);
+//    vec4 compareColor = mix(vec4(resultRgb, centerColor.a), centerColor, band);
     gl_FragColor = vec4(resultRgb, centerColor.a);
 }
 

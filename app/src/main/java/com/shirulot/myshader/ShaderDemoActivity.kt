@@ -364,7 +364,7 @@ class ShaderDemoActivity : ComponentActivity() {
         )
     }
 
-    /** 暖色强度映射为 0.00 到 3.00，并上传给 Shader uniform。 */
+    /** 饱和度映射为 0.00 到 1.00，并上传给 Shader uniform。 */
     private fun addWarmthStrengthControl(panel: LinearLayout) {
         val strengthText = TextView(this).apply {
             setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
@@ -440,8 +440,8 @@ class ShaderDemoActivity : ComponentActivity() {
         private const val BLUR_STRENGTH_DEFAULT_PROGRESS = 0
         private const val DEFAULT_BLUR_STRENGTH = 0f
         private const val WARMTH_STRENGTH_MIN = 0f
-        private const val WARMTH_STRENGTH_MAX = 3f
-        private const val WARMTH_STRENGTH_STEP = 0.03f
+        private const val WARMTH_STRENGTH_MAX = 1f
+        private const val WARMTH_STRENGTH_STEP = 0.01f
         private const val WARMTH_STRENGTH_PROGRESS_MAX = 100
         private const val WARMTH_STRENGTH_DEFAULT_PROGRESS = 0
         private const val DEFAULT_WARMTH_STRENGTH = 0f

@@ -9,7 +9,7 @@ data class ShaderDemo(
     val fragmentShaderAsset: String,
     // 所有 Demo 默认从原图开始；未声明 whitenStrength 的 Shader 不受影响。
     val initialWhitenStrength: Float = 0f,
-    // 滑条展示由课程分组决定；渲染器仍会安全忽略未声明的 uniform。
+    // 滑条展示按 Demo 的实际最终输出决定；渲染器仍会安全忽略未声明的 uniform。
     val showWhitenStrengthControl: Boolean = false,
     val showBlurStrengthControl: Boolean = false,
     // 暖色滑条控制 Shader 的 warmthStrength uniform。
@@ -73,11 +73,25 @@ object ShaderDemoCatalog {
         ShaderDemoGroup(
             titleRes = R.string.demo_group_local_color_difference_debug,
             demos = listOf(
-                // 此 Demo 直接输出局部色差灰度图，调试结果不使用磨皮混合值。
+                // 此 Demo 最终输出局部色差灰度图，resultRgb 未参与输出，因此不展示滑条。
                 ShaderDemo(R.string.demo_18_title, R.string.demo_18_description, "shaders/local_color_difference_debug/demo_18_edge_difference_debug.frag"),
-                ShaderDemo(R.string.demo_19_title, R.string.demo_19_description, "shaders/local_color_difference_debug/demo_19_warm_skin_smoothing.frag"),
-                ShaderDemo(R.string.demo_20_title, R.string.demo_20_description, "shaders/local_color_difference_debug/demo_20_local_warm_tone_debug.frag"),
-                ShaderDemo(R.string.demo_21_title, R.string.demo_21_description, "shaders/local_color_difference_debug/demo_21_warmth_strength_uniform.frag"),
+                ShaderDemo(R.string.demo_19_title, R.string.demo_19_description, "shaders/local_color_difference_debug/demo_19_warm_skin_smoothing.frag", showBlurStrengthControl = true),
+                ShaderDemo(R.string.demo_20_title, R.string.demo_20_description, "shaders/local_color_difference_debug/demo_20_local_warm_tone_debug.frag", showBlurStrengthControl = true),
+                ShaderDemo(R.string.demo_21_title, R.string.demo_21_description, "shaders/local_color_difference_debug/demo_21_warmth_strength_uniform.frag", showBlurStrengthControl = true, showWarmthStrengthControl = true),
+            ),
+            initiallyExpanded = false,
+        ),
+        ShaderDemoGroup(
+            titleRes = R.string.demo_group_brightness_and_chroma,
+            demos = listOf(
+                ShaderDemo(R.string.demo_22_title, R.string.demo_22_description, "shaders/brightness_and_chroma/demo_22_luminance_chroma_debug.frag", showBlurStrengthControl = true, showWarmthStrengthControl = true),
+                ShaderDemo(R.string.demo_23_title, R.string.demo_23_description, "shaders/brightness_and_chroma/demo_23_luminance_range_warmth.frag", showBlurStrengthControl = true, showWarmthStrengthControl = true),
+                ShaderDemo(R.string.demo_24_title, R.string.demo_24_description, "shaders/brightness_and_chroma/demo_24_midtone_weight_debug.frag", showBlurStrengthControl = true, showWarmthStrengthControl = true),
+                ShaderDemo(R.string.demo_25_title, R.string.demo_25_description, "shaders/brightness_and_chroma/demo_25_warmth_weight_debug.frag", showBlurStrengthControl = true, showWarmthStrengthControl = true),
+                ShaderDemo(R.string.demo_26_title, R.string.demo_26_description, "shaders/brightness_and_chroma/demo_26_chroma_enhancement.frag", showBlurStrengthControl = true, showWarmthStrengthControl = true),
+                ShaderDemo(R.string.demo_27_title, R.string.demo_27_description, "shaders/brightness_and_chroma/demo_27_warm_tone_result.frag", showBlurStrengthControl = true, showWarmthStrengthControl = true),
+                // Demo 28 归档当前 main.frag，最终输出使用磨皮结果和暖色/饱和度结果。
+                ShaderDemo(R.string.demo_28_title, R.string.demo_28_description, "shaders/brightness_and_chroma/demo_28_warm_saturation_range.frag", showBlurStrengthControl = true, showWarmthStrengthControl = true),
             ),
             initiallyExpanded = false,
         ),

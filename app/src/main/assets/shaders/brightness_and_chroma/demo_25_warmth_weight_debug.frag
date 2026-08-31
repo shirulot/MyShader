@@ -7,7 +7,7 @@ varying vec2 textureCoordinate;
 vec4 centerColor;
 float scale = 3.0;
 
-//取亮度 RC709
+//取亮度
 vec3 lightRec709 = vec3(0.2126, 0.7152, 0.0722);
 // 补暖色调公式(单位)
 vec3 redFix = vec3(1.0, 0.0, -0.2126 / 0.0722);
@@ -15,31 +15,9 @@ vec3 redFix = vec3(1.0, 0.0, -0.2126 / 0.0722);
 // 有效高光带
 float HIGHTLIGHT_START = 0.65;
 float HIGHTLIGHT_END = 0.9;
-
-// 有效阴影带,阴影保护 (亮度保护)
+// 有效阴影带
 float SHADOW_START = 0.1;
 float SHADOW_END = 0.3;
-
-// 饱和度保护
-// HSV 饱和度保护：0.55 开始保护，0.85 完全停止额外增饱和。
-float SATURATION_START = 0.55;
-float SATURATION_END = 0.85;
-
-// 边缘保护
-float EDGE_START = 0.03;
-float EDGE_END = 0.12;
-
-// 同色色差长度识别 如果色差长度在范围内则认为是同色/近似色
-float COLOR_DIFF_START = 0.03;
-float COLOR_DIFF_END = 0.18;
-
-// 肤色的红蓝色差 - 肤色识别
-float SKIN_DIFF_RB_START = 0.04;
-float SKIN_DIFF_RB_END = 0.16;
-
-// 肤色的红绿色差 - 肤色识别
-float SKIN_DIFF_RG_START = 0.00;
-float SKIN_DIFF_RG_END = 0.08;
 
 vec3 calculateBilateralAverageRgb(float scale);
 vec3 createWarmToneOffset(float warmth);
@@ -65,7 +43,7 @@ void main() {
     // 原色与模糊色差距代表边缘强度。
     float edgeStrength = length(centerColor.rgb - averageRgb);
     // 明显边缘得到更高保护权重。
-    float edgeProtection = smoothstep(EDGE_START, EDGE_END, edgeStrength);
+    float edgeProtection = smoothstep(0.03, 0.12, edgeStrength);
     // 将 SeekBar 强度映射到安全的 0 到 1。
     float strengthWeight = clamp(blurStrength, 0.0, 1.0);
     // 得到最终局部磨皮比例。
@@ -86,51 +64,26 @@ void main() {
     float midToneWeight = smoothstep(SHADOW_START, SHADOW_END, luminance) * (1.0 - smoothstep(HIGHTLIGHT_START, HIGHTLIGHT_END, luminance));
     // 皮肤、非边缘且处于中间亮度时才调整暖色色度。
     float warmthWeight = skinWeight * (1.0 - edgeProtection) * midToneWeight;
-
-    // 从磨皮后的颜色重新计算亮度，用于亮度与色度重组。
-    float smoothedLuminance = dot(smoothedRgb, lightRec709);
-    // 去掉灰度亮度后，剩余部分就是当前颜色的色度偏移。
-    vec3 smoothedChroma = smoothedRgb - vec3(smoothedLuminance);
-//    // 色度偏移的长度表示当前像素本身有多鲜艳。 当前离灰色有多远越大越鲜艳
-//    float chromaStrength = length(smoothedChroma);
-//    // 色度低于 0.16 不保护；0.16 到 0.32 逐渐停止额外增饱和。
-//    // 所以实际起到一个鲜艳色保护以及灰色保护的作用 也就是饱和度保护
-//    float saturationProtection = 1.0 - smoothstep(SATURATION_START, SATURATION_END, chromaStrength);
-
-    // HSV S-饱和度的最大 RGB 通道。
-    float maxChannel = max(smoothedRgb.r, max(smoothedRgb.g, smoothedRgb.b));
-    // HSV S-饱和度的最小 RGB 通道。
-    float minChannel = min(smoothedRgb.r, min(smoothedRgb.g, smoothedRgb.b));
-    // 用最大通道保护除零，得到范围为 0 到 1 的 HSV 饱和度。
-    float hsvSaturation = (maxChannel - minChannel) / max(maxChannel, 0.0001);
-    // HSV 饱和度从 0.55 开始保护，到 0.85 时停止额外增饱和。还被允许增加多少饱和
-    float saturationAllowance = 1.0 - smoothstep(SATURATION_START, SATURATION_END, hsvSaturation);
-
-    // 最终色度增强权重同时受补暖范围和高饱和保护限制。
-    float saturationWeight = warmthWeight * saturationAllowance;
-    // 仅在最终允许区域放大色度；0.12 表示最高额外增加 12%。
-    vec3 saturatedRgb = vec3(smoothedLuminance) + smoothedChroma * (1.0 + 0.12 * saturationWeight);
-    // 在色度增强结果上继续叠加原有的暖色色度偏移。
-    vec3 resultRgb = clamp(saturatedRgb + warmChromaOffset * warmthWeight, vec3(0.0), vec3(1.0));
+    // 只叠加色度偏移，并把 RGB 限制在合法范围。
+    vec3 resultRgb = clamp(smoothedRgb + warmChromaOffset * warmthWeight, vec3(0.0), vec3(1.0));
 
 
     // 每半屏按 y 再分为两条横带，便于同时观察四种输出。
     // step 阈值方法 param 2 < param 1 则返回0 否则 1
-    //    float band = step(0.5, textureCoordinate.y);
-    //    // 将最终色度增强权重绘制为灰度图，白色表示可完整增饱和。
-    //    vec3 saturationDebug = vec3(saturationWeight);
-    //    // 实际以下三行不做mix因为step只会有 0或者1 这里就是一个if else
-    //    vec4 debugColor = mix(vec4(saturationDebug, centerColor.a), vec4(vec3(luminance), centerColor.a), band);
-    //    vec4 compareColor = mix(vec4(resultRgb, centerColor.a), centerColor, band);
-    gl_FragColor = vec4(resultRgb, centerColor.a);
+    float band = step(0.5, textureCoordinate.y);
+    vec3 warmthDebug = vec3(warmthWeight);
+    // 实际以下三行不做mix因为step只会有 0或者1 这里就是一个if else
+    vec4 debugColor = mix(vec4(warmthDebug, centerColor.a), vec4(vec3(luminance), centerColor.a), band);
+    vec4 compareColor = mix(vec4(resultRgb, centerColor.a), centerColor, band);
+    gl_FragColor = mix(debugColor, compareColor, step(0.5, textureCoordinate.x));
 }
 
 // 获取肤色权重
 float getSkinWeight(){
     // 红蓝差对应的皮肤权重。
-    float redBlueWeight = smoothstep(SKIN_DIFF_RB_START, SKIN_DIFF_RB_END, centerColor.r - centerColor.b);
+    float redBlueWeight = smoothstep(0.04, 0.16, centerColor.r - centerColor.b);
     // 红绿差对应的皮肤权重。
-    float redGreenWeight = smoothstep(SKIN_DIFF_RG_START, SKIN_DIFF_RG_END, centerColor.r - centerColor.g);
+    float redGreenWeight = smoothstep(0.00, 0.08, centerColor.r - centerColor.g);
     // 两项条件共同限制皮肤权重。
     return min(redBlueWeight, redGreenWeight);
 }
@@ -150,7 +103,7 @@ float getDiffLength(vec3 target){
 // 如果0.18或以上 我们认为他完全不是一种颜色
 // 因为我们需要的色差权重逻辑应该是色差越小权重越大 和这里的逻辑相反 需要用1-去取反
 float getWeight (float diff){
-    return 1.0 - smoothstep(COLOR_DIFF_START, COLOR_DIFF_END, diff);
+    return 1.0 - smoothstep(0.03, 0.18, diff);
 }
 
 // 双边滤波算法 让色差大的占权重低 色差小的占权重高 使得整体更加平滑 如果色差过大则不进行磨皮

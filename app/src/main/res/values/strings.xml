@@ -14,8 +14,8 @@
     <string name="shader_demo_whiten_strength_content_description">美白混白值，范围 0.00 到 1.00</string>
     <string name="shader_demo_blur_strength_label">磨皮强度：%1$.2f</string>
     <string name="shader_demo_blur_strength_content_description">磨皮强度，范围 0.00 到 1.00</string>
-    <string name="shader_demo_warmth_strength_label">暖色强度：%1$.2f</string>
-    <string name="shader_demo_warmth_strength_content_description">暖色强度，范围 0.00 到 3.00</string>
+    <string name="shader_demo_warmth_strength_label">饱和度：%1$.2f</string>
+    <string name="shader_demo_warmth_strength_content_description">饱和度，范围 0.00 到 1.00</string>
     <string name="shader_demo_controls_collapse">收起 ▼</string>
     <string name="shader_demo_controls_expand">展开 ▲</string>
     <string name="shader_demo_controls_collapse_content_description">收起底部控制面板</string>
@@ -72,8 +72,23 @@
     <string name="demo_20_description">根据肤色与边缘遮罩，只在局部平滑结果上叠加轻微暖色，右侧保留原图。</string>
     <string name="demo_21_title">Demo 21 · 暖色强度参数</string>
     <string name="demo_21_description">通过 warmthStrength 参数限制局部暖色偏移，右侧保留原图。</string>
+    <string name="demo_22_title">Demo 22 · 亮度与色度四分屏</string>
+    <string name="demo_22_description">左侧显示色度与亮度，右侧对比当前处理结果与原图。</string>
+    <string name="demo_23_title">Demo 23 · 中间亮度暖色调</string>
+    <string name="demo_23_description">只在肤色、中间亮度且非边缘区域叠加暖色色度，观察亮度范围保护效果。</string>
+    <string name="demo_24_title">Demo 24 · 中间亮度权重调试</string>
+    <string name="demo_24_description">用灰度显示中间亮度权重，同时对比亮度、暖色处理结果与原图。</string>
+    <string name="demo_25_title">Demo 25 · 暖色综合权重调试</string>
+    <string name="demo_25_description">用灰度显示肤色、边缘和中间亮度共同计算的暖色权重，同时对比亮度与处理结果。</string>
+    <string name="demo_26_title">Demo 26 · 色度增强</string>
+    <string name="demo_26_description">从磨皮结果中分离亮度与色度，在保持亮度的基础上增强局部色彩并叠加暖色。</string>
+    <string name="demo_27_title">Demo 27 · 暖色调色结果</string>
+    <string name="demo_27_description">在肤色、中间亮度和边缘保护条件下完成暖色色度调整，输出最终处理结果。</string>
+    <string name="demo_28_title">Demo 28 · 暖色/饱和度范围</string>
+    <string name="demo_28_description">归档当前暖色调色结果，暖色/饱和度强度范围为 0.00 到 1.00。</string>
     <string name="demo_group_basics">基础</string>
     <string name="demo_group_whitening">美白</string>
     <string name="demo_group_skin_smoothing">磨皮</string>
     <string name="demo_group_local_color_difference_debug">局部色差调试</string>
+    <string name="demo_group_brightness_and_chroma">亮度与色度</string>
 </resources>

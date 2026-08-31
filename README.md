@@ -18,10 +18,10 @@
 
 1. 首页按分组展示 Demo，组头默认收起。
 2. 进入任意 Demo 后，可以切换“原练习图”和“新的人像”。
-3. 基础组不显示滑条；美白组只显示美白滑条；磨皮组与当前 `main.frag` 入口只显示磨皮滑条。暖色滑条默认隐藏。范围均为 `0.00–1.00`，默认值为 `0.00`。
+3. 基础组不显示滑条；美白组只显示美白滑条；磨皮组与当前 `main.frag` 入口只显示磨皮滑条。Demo 18 不显示滑条，Demo 19–20 只显示磨皮，Demo 21–28 显示磨皮和饱和度。美白、磨皮和饱和度范围均为 `0.00–1.00`，默认值均为 `0.00`。
 4. 只有声明了 `whitenStrength` 或 `blurStrength` 的片元着色器会响应对应滑条；未声明时画面保持不变。
 5. 底部控制面板可收起；收起时面板下滑且测试图片不再被遮挡，点击底部“展开”后面板上滑恢复。
-6. 暖色滑条当前仅用于 UI 交互和数值展示，尚未传入 Shader，因此拖动不会改变画面。需要展示时，在 `ShaderDemoCatalog` 对应的 `ShaderDemo` 上添加 `showWarmthStrengthControl = true`。
+6. 控件是否显示按 Shader 的最终输出判断，而不是只看 uniform 声明；例如 Demo 18 虽声明 `blurStrength`，但最终输出未使用磨皮结果，所以不显示。饱和度滑条会上传 `warmthStrength`，范围为 `0.00–1.00`。
 
 ## 练习内容
 
@@ -60,12 +60,22 @@
 - Demo 20：局部暖色调试
 - Demo 21：暖色强度参数
 
+### 亮度与色度
+
+- Demo 22：亮度与色度四分屏
+- Demo 23：中间亮度暖色调
+- Demo 24：中间亮度权重调试
+- Demo 25：暖色综合权重调试
+- Demo 26：色度增强
+- Demo 27：暖色调色结果
+- Demo 28：暖色/饱和度范围
+
 ## 目录说明
 
 ```text
 app/src/main/assets/main.frag   # 当前练习中的主片元 Shader
 app/src/main/assets/main.vert   # 共用主顶点 Shader
-app/src/main/assets/shaders/    # 按 basic、whitening、skin_smoothing、local_color_difference_debug 分类的 Demo
+app/src/main/assets/shaders/    # 按 basic、whitening、skin_smoothing、local_color_difference_debug、brightness_and_chroma 分类的 Demo
 app/src/main/java/.../          # Android 页面、列表与 OpenGL 渲染器
 app/src/main/res/drawable-nodpi # 两张本地测试人像
 ```
