@@ -41,12 +41,9 @@ float SKIN_DIFF_RG_START = 0.00;
 float SKIN_DIFF_RG_END = 0.08;
 
 vec3 calculateBilateralAverageRgb(float scale);
-vec3 createWarmToneOffset(float warmth);
 float getSkinWeight();
 
 void main() {
-    // 原图直通：采样结果不做任何颜色处理。
-    gl_FragColor = texture2D(inputImageTexture, textureCoordinate);
     // 左半屏显示分离调试，右半屏保留当前效果与原图对比。
     // 当前像素原色。
     centerColor = texture2D(inputImageTexture, textureCoordinate);
@@ -57,8 +54,6 @@ void main() {
     // 亮度把 RGB 按视觉权重压缩成一个明暗值。
     // dot vec3每项的值相乘并且加起来 这里是取亮度的范式写法
     float luminance = dot(centerColor.rgb, lightRec709);
-    // 色度是 RGB 相对亮度的偏差；中性灰表示没有偏色。
-    vec3 chromaDebug = clamp((centerColor.rgb - vec3(luminance)) * 4.0 + vec3(0.5), 0.0, 1.0);
     // 两项条件共同限制皮肤权重。
     float skinWeight = getSkinWeight();
     // 原色与模糊色差距代表边缘强度。
@@ -122,11 +117,6 @@ float getSkinWeight(){
     float redGreenWeight = smoothstep(SKIN_DIFF_RG_START, SKIN_DIFF_RG_END, centerColor.r - centerColor.g);
     // 两项条件共同限制皮肤权重。
     return min(redBlueWeight, redGreenWeight);
-}
-
-// 暖色调值 粗略算法 后续可以直接用 redFix
-vec3 createWarmToneOffset(float warmth){
-    return vec3(warmth, warmth * 0.35, 0.0);
 }
 
 // 计算和当前色的色差

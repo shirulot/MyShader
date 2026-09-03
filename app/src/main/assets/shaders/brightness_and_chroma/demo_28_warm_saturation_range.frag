@@ -42,12 +42,9 @@ float SKIN_DIFF_RG_START = 0.00;
 float SKIN_DIFF_RG_END = 0.08;
 
 vec3 calculateBilateralAverageRgb(float scale);
-vec3 createWarmToneOffset(float warmth);
 float getSkinWeight();
 
 void main() {
-    // 原图直通：采样结果不做任何颜色处理。
-    gl_FragColor = texture2D(inputImageTexture, textureCoordinate);
     // 左半屏显示分离调试，右半屏保留当前效果与原图对比。
     // 当前像素原色。
     centerColor = texture2D(inputImageTexture, textureCoordinate);
@@ -58,8 +55,6 @@ void main() {
     // 亮度把 RGB 按视觉权重压缩成一个明暗值。
     // dot vec3每项的值相乘并且加起来 这里是取亮度的范式写法
     float luminance = dot(centerColor.rgb, lightRec709);
-    // 色度是 RGB 相对亮度的偏差；中性灰表示没有偏色。
-    vec3 chromaDebug = clamp((centerColor.rgb - vec3(luminance)) * 4.0 + vec3(0.5), 0.0, 1.0);
     // 两项条件共同限制皮肤权重。
     float skinWeight = getSkinWeight();
     // 原色与模糊色差距代表边缘强度。
@@ -91,11 +86,11 @@ void main() {
     float smoothedLuminance = dot(smoothedRgb, lightRec709);
     // 去掉灰度亮度后，剩余部分就是当前颜色的色度偏移。
     vec3 smoothedChroma = smoothedRgb - vec3(smoothedLuminance);
-//    // 色度偏移的长度表示当前像素本身有多鲜艳。 当前离灰色有多远越大越鲜艳
-//    float chromaStrength = length(smoothedChroma);
-//    // 色度低于 0.16 不保护；0.16 到 0.32 逐渐停止额外增饱和。
-//    // 所以实际起到一个鲜艳色保护以及灰色保护的作用 也就是饱和度保护
-//    float saturationProtection = 1.0 - smoothstep(SATURATION_START, SATURATION_END, chromaStrength);
+    //    // 色度偏移的长度表示当前像素本身有多鲜艳。 当前离灰色有多远越大越鲜艳
+    //    float chromaStrength = length(smoothedChroma);
+    //    // 色度低于 0.16 不保护；0.16 到 0.32 逐渐停止额外增饱和。
+    //    // 所以实际起到一个鲜艳色保护以及灰色保护的作用 也就是饱和度保护
+    //    float saturationProtection = 1.0 - smoothstep(SATURATION_START, SATURATION_END, chromaStrength);
 
     // HSV S-饱和度的最大 RGB 通道。
     float maxChannel = max(smoothedRgb.r, max(smoothedRgb.g, smoothedRgb.b));
@@ -133,11 +128,6 @@ float getSkinWeight(){
     float redGreenWeight = smoothstep(SKIN_DIFF_RG_START, SKIN_DIFF_RG_END, centerColor.r - centerColor.g);
     // 两项条件共同限制皮肤权重。
     return min(redBlueWeight, redGreenWeight);
-}
-
-// 暖色调值 粗略算法 后续可以直接用 redFix
-vec3 createWarmToneOffset(float warmth){
-    return vec3(warmth, warmth * 0.35, 0.0);
 }
 
 // 计算和当前色的色差

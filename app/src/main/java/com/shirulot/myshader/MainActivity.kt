@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
                     showWhitenStrengthControl = demo.showWhitenStrengthControl,
                     showBlurStrengthControl = demo.showBlurStrengthControl,
                     showWarmthStrengthControl = demo.showWarmthStrengthControl,
+                    showSaturationStrengthControl = demo.showSaturationStrengthControl,
                 ),
             )
         }

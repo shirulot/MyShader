@@ -56,6 +56,16 @@ class ShaderSurfaceView(
         queueEvent { shaderRenderer.setWarmthStrength(value) }
     }
 
+    fun setSaturationStrength(value: Float) {
+        // SeekBar 回调来自主线程，uniform 状态必须在 GL 线程更新。
+        queueEvent { shaderRenderer.setSaturationStrength(value) }
+    }
+
+    fun setFaceCenterRegion(centerX: Float, centerY: Float, width: Float, height: Float) {
+        // 人脸结果来自后台线程，uniform 状态仍只在 GL 线程更新。
+        queueEvent { shaderRenderer.setFaceCenter(centerX, centerY, width, height) }
+    }
+
     fun setSourceImage(@DrawableRes sourceImageRes: Int) {
         // 切换图片会创建和删除 OpenGL 纹理，因此同样只能在 GL 线程执行。
         queueEvent { shaderRenderer.setSourceImage(sourceImageRes) }
@@ -68,6 +78,15 @@ private class ShaderRenderer(
     private val fragmentShaderAsset: String,
     private val onStatusChanged: (String) -> Unit,
 ) : GLSurfaceView.Renderer {
+
+    // 尚未拿到人脸检测结果时，不显示局部脸部区域。
+    private var faceCenterReady = false
+
+    //人脸中心点
+    private var faceCenterX = 0.5f
+    private var faceCenterY = 0.5f
+    private var faceWidth = 0.3f
+    private var faceHeight = 0.4f
     private val mainHandler = Handler(Looper.getMainLooper())
     private val positionBuffer = createFloatBuffer(
         floatArrayOf(
@@ -97,6 +116,7 @@ private class ShaderRenderer(
     private var whitenStrength = DEFAULT_WHITEN_STRENGTH
 
     private var warmthStrength = DEFAULT_WARMTH_STRENGTH
+    private var saturationStrength = DEFAULT_SATURATION_STRENGTH
     private var blurStrength = DEFAULT_BLUR_STRENGTH
 
     override fun onSurfaceCreated(unused: GL10?, config: EGLConfig?) {
@@ -157,6 +177,11 @@ private class ShaderRenderer(
         val whitenStrengthLocation = GLES20.glGetUniformLocation(program, "whitenStrength")
         val blurStrengthLocation = GLES20.glGetUniformLocation(program, "blurStrength")
         val warmthStrengthLocation = GLES20.glGetUniformLocation(program, "warmthStrength")
+        val saturationStrengthLocation = GLES20.glGetUniformLocation(program, "saturationStrength")
+        val faceCenterLocation = GLES20.glGetUniformLocation(program, "faceCenter")
+        val faceCenterReadyLocation = GLES20.glGetUniformLocation(program, "faceCenterReady")
+        val faceSizeLocation = GLES20.glGetUniformLocation(program, "faceSize")
+
         if (positionLocation < 0 || textureCoordinateLocation < 0 || textureLocation < 0) {
             postStatus(context.getString(R.string.shader_demo_status_interface_error))
             return
@@ -200,12 +225,27 @@ private class ShaderRenderer(
         if (warmthStrengthLocation >= 0) {
             GLES20.glUniform1f(warmthStrengthLocation, warmthStrength)
         }
+        // 只有声明 saturationStrength 的 Shader 才接收饱和度强度。
+        if (saturationStrengthLocation >= 0) {
+            GLES20.glUniform1f(saturationStrengthLocation, saturationStrength)
+        }
+        // 面部中心点
+        if (faceCenterLocation >= 0) {
+            GLES20.glUniform2f(faceCenterLocation, faceCenterX, faceCenterY)
+        }
 
+        if (faceCenterReadyLocation >= 0) {
+            GLES20.glUniform1f(faceCenterReadyLocation, if (faceCenterReady) 1f else 0f)
+        }
+        if (faceSizeLocation >= 0) {
+            GLES20.glUniform2f(faceSizeLocation, faceWidth, faceHeight)
+        }
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
         GLES20.glDisableVertexAttribArray(positionLocation)
         GLES20.glDisableVertexAttribArray(textureCoordinateLocation)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0)
     }
+
 
     fun release() {
         if (textureId != 0) {
@@ -220,6 +260,14 @@ private class ShaderRenderer(
         image = null
     }
 
+    fun setFaceCenter(centerX: Float, centerY: Float, width: Float, height: Float) {
+        faceCenterX = centerX.coerceIn(0f, 1f)
+        faceCenterY = centerY.coerceIn(0f, 1f)
+        faceWidth = width.coerceIn(0.01f, 1f)
+        faceHeight = height.coerceIn(0.01f, 1f)
+        faceCenterReady = true
+    }
+
     fun setBlurStrength(value: Float) {
         blurStrength = value.coerceIn(MIN_BLUR_STRENGTH, MAX_BLUR_STRENGTH)
     }
@@ -230,6 +278,10 @@ private class ShaderRenderer(
 
     fun setWarmthStrength(value: Float) {
         warmthStrength = value.coerceIn(MIN_WARMTH_STRENGTH, MAX_WARMTH_STRENGTH)
+    }
+
+    fun setSaturationStrength(value: Float) {
+        saturationStrength = value.coerceIn(MIN_SATURATION_STRENGTH, MAX_SATURATION_STRENGTH)
     }
 
     fun setSourceImage(@DrawableRes resourceId: Int) {
@@ -391,6 +443,9 @@ private class ShaderRenderer(
         const val DEFAULT_WARMTH_STRENGTH = 0f
         const val MIN_WARMTH_STRENGTH = 0f
         const val MAX_WARMTH_STRENGTH = 1f
+        const val DEFAULT_SATURATION_STRENGTH = 0f
+        const val MIN_SATURATION_STRENGTH = 0f
+        const val MAX_SATURATION_STRENGTH = 0.3f
         const val DEFAULT_BLUR_STRENGTH = 0f
         const val MIN_BLUR_STRENGTH = 0f
         const val MAX_BLUR_STRENGTH = 1f

@@ -3,19 +3,18 @@ package com.shirulot.myshader
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.Gravity
 import android.view.ViewGroup
-import android.widget.FrameLayout
-import android.widget.LinearLayout
-import android.widget.RadioButton
-import android.widget.RadioGroup
-import android.widget.SeekBar
-import android.widget.TextView
+import android.widget.*
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 /**
  * 独立的 Shader 练习页：只负责把 OpenGL Surface 和少量状态文字放到屏幕上。
@@ -30,7 +29,6 @@ class ShaderDemoActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
         statusText = TextView(this).apply {
             setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
             text = getString(R.string.shader_demo_status_loading)
@@ -58,6 +56,10 @@ class ShaderDemoActivity : ComponentActivity() {
             EXTRA_SHOW_WARMTH_STRENGTH_CONTROL,
             false,
         )
+        val showSaturationStrengthControl = intent.getBooleanExtra(
+            EXTRA_SHOW_SATURATION_STRENGTH_CONTROL,
+            false,
+        )
 
         shaderSurfaceView = ShaderSurfaceView(this, fragmentShaderAsset) { message ->
             // GLSurfaceView 的回调运行在 GL 线程，状态文字必须切回主线程更新。
@@ -70,7 +72,19 @@ class ShaderDemoActivity : ComponentActivity() {
         // 不展示的控件仍使用默认 0.00，避免改变基础或原图直通的默认画面。
         shaderSurfaceView.setWhitenStrength(initialWhitenStrength)
         shaderSurfaceView.setBlurStrength(DEFAULT_BLUR_STRENGTH)
+        shaderSurfaceView.setSaturationStrength(DEFAULT_SATURATION_STRENGTH)
 
+        GlobalScope.launch(IO) {
+            val landmarks = FaceAnalysis.detectLessonFace(resources)
+            val faceCenterRegion = FaceAnalysis.calculateFaceRegion(landmarks)
+            shaderSurfaceView.setFaceCenterRegion(
+                faceCenterRegion.centerX,
+                faceCenterRegion.centerY,
+                faceCenterRegion.width,
+                faceCenterRegion.height
+            )
+            Log.i("FaceAnalysis", "pointCount=${landmarks.size / 2}, center=$faceCenterRegion")
+        }
         val root = FrameLayout(this).apply {
             setBackgroundColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_background))
         }
@@ -119,6 +133,9 @@ class ShaderDemoActivity : ComponentActivity() {
             }
             if (showWarmthStrengthControl) {
                 addWarmthStrengthControl(this)
+            }
+            if (showSaturationStrengthControl) {
+                addSaturationStrengthControl(this)
             }
         }
         ViewCompat.setOnApplyWindowInsetsListener(controlPanel) { view, windowInsets ->
@@ -364,7 +381,7 @@ class ShaderDemoActivity : ComponentActivity() {
         )
     }
 
-    /** 饱和度映射为 0.00 到 1.00，并上传给 Shader uniform。 */
+    /** 暖色补正映射为 0.00 到 1.00，并上传给 Shader uniform。 */
     private fun addWarmthStrengthControl(panel: LinearLayout) {
         val strengthText = TextView(this).apply {
             setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
@@ -379,9 +396,49 @@ class ShaderDemoActivity : ComponentActivity() {
                 override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                     val value = warmthStrengthFromProgress(progress)
                     strengthText.text = getString(R.string.shader_demo_warmth_strength_label, value)
-                    // 将暖色强度上传给当前 Shader。
+                    // 将暖色补正强度上传给当前 Shader。
                     shaderSurfaceView.setWarmthStrength(value)
 
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
+
+                override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
+            })
+        }
+        panel.addView(
+            strengthText,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(8) },
+        )
+        panel.addView(
+            strengthSeekBar,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+    }
+
+    /** 饱和度映射为 0.00 到 0.30，并上传给 Shader uniform。 */
+    private fun addSaturationStrengthControl(panel: LinearLayout) {
+        val strengthText = TextView(this).apply {
+            setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
+            textSize = 13f
+            text = getString(R.string.shader_demo_saturation_strength_label, DEFAULT_SATURATION_STRENGTH)
+        }
+        val strengthSeekBar = SeekBar(this).apply {
+            max = SATURATION_STRENGTH_PROGRESS_MAX
+            progress = SATURATION_STRENGTH_DEFAULT_PROGRESS
+            contentDescription = getString(R.string.shader_demo_saturation_strength_content_description)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                    val value = saturationStrengthFromProgress(progress)
+                    strengthText.text = getString(R.string.shader_demo_saturation_strength_label, value)
+                    // 将饱和度强度上传给当前 Shader。
+                    shaderSurfaceView.setSaturationStrength(value)
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
@@ -411,10 +468,14 @@ class ShaderDemoActivity : ComponentActivity() {
     private fun warmthStrengthFromProgress(progress: Int): Float =
         (WARMTH_STRENGTH_MIN + progress * WARMTH_STRENGTH_STEP).coerceAtMost(WARMTH_STRENGTH_MAX)
 
+    private fun saturationStrengthFromProgress(progress: Int): Float =
+        (SATURATION_STRENGTH_MIN + progress * SATURATION_STRENGTH_STEP)
+            .coerceAtMost(SATURATION_STRENGTH_MAX)
+
     /** 将初始美白值映射为 SeekBar 进度，保证页面首次显示与 Shader 初值一致。 */
     private fun whitenStrengthToProgress(value: Float): Int =
         ((value.coerceIn(WHITEN_STRENGTH_MIN, WHITEN_STRENGTH_MAX) - WHITEN_STRENGTH_MIN) /
-            WHITEN_STRENGTH_STEP).toInt()
+                WHITEN_STRENGTH_STEP).toInt()
 
     private fun whitenStrengthFromProgress(progress: Int): Float =
         (WHITEN_STRENGTH_MIN + progress * WHITEN_STRENGTH_STEP)
@@ -427,6 +488,7 @@ class ShaderDemoActivity : ComponentActivity() {
         private const val EXTRA_SHOW_WHITEN_STRENGTH_CONTROL = "show_whiten_strength_control"
         private const val EXTRA_SHOW_BLUR_STRENGTH_CONTROL = "show_blur_strength_control"
         private const val EXTRA_SHOW_WARMTH_STRENGTH_CONTROL = "show_warmth_strength_control"
+        private const val EXTRA_SHOW_SATURATION_STRENGTH_CONTROL = "show_saturation_strength_control"
         private const val DEFAULT_FRAGMENT_SHADER_ASSET = "main.frag"
         private const val WHITEN_STRENGTH_MIN = 0f
         private const val WHITEN_STRENGTH_MAX = 1f
@@ -445,6 +507,12 @@ class ShaderDemoActivity : ComponentActivity() {
         private const val WARMTH_STRENGTH_PROGRESS_MAX = 100
         private const val WARMTH_STRENGTH_DEFAULT_PROGRESS = 0
         private const val DEFAULT_WARMTH_STRENGTH = 0f
+        private const val SATURATION_STRENGTH_MIN = 0f
+        private const val SATURATION_STRENGTH_MAX = 0.3f
+        private const val SATURATION_STRENGTH_STEP = 0.01f
+        private const val SATURATION_STRENGTH_PROGRESS_MAX = 30
+        private const val SATURATION_STRENGTH_DEFAULT_PROGRESS = 0
+        private const val DEFAULT_SATURATION_STRENGTH = 0f
         private const val CONTROL_PANEL_ANIMATION_DURATION_MS = 220L
         private const val EXPAND_BUTTON_ENTER_OFFSET_DP = 12
 
@@ -457,6 +525,7 @@ class ShaderDemoActivity : ComponentActivity() {
             showWhitenStrengthControl: Boolean,
             showBlurStrengthControl: Boolean,
             showWarmthStrengthControl: Boolean,
+            showSaturationStrengthControl: Boolean,
         ): Intent = Intent(context, ShaderDemoActivity::class.java).apply {
             putExtra(EXTRA_FRAGMENT_SHADER_ASSET, fragmentShaderAsset)
             putExtra(EXTRA_DEMO_TITLE, demoTitle)
@@ -464,6 +533,7 @@ class ShaderDemoActivity : ComponentActivity() {
             putExtra(EXTRA_SHOW_WHITEN_STRENGTH_CONTROL, showWhitenStrengthControl)
             putExtra(EXTRA_SHOW_BLUR_STRENGTH_CONTROL, showBlurStrengthControl)
             putExtra(EXTRA_SHOW_WARMTH_STRENGTH_CONTROL, showWarmthStrengthControl)
+            putExtra(EXTRA_SHOW_SATURATION_STRENGTH_CONTROL, showSaturationStrengthControl)
         }
     }
 }

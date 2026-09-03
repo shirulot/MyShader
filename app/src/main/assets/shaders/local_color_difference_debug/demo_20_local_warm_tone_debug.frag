@@ -11,8 +11,6 @@ vec3 createWarmToneOffset(float warmth);
 float getSkinWeight();
 
 void main() {
-    // 原图直通：采样结果不做任何颜色处理。
-    gl_FragColor = texture2D(inputImageTexture, textureCoordinate);
     // 左侧显示效果，右侧显示原图。
     bool isProcessedSide = textureCoordinate.x <= 0.5;
     // 当前像素原色。

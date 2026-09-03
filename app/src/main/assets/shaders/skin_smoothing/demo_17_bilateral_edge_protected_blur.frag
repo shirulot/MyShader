@@ -9,8 +9,6 @@ float scale = 3.0;
 vec3 calculateBilateralAverageRgb(float scale);
 
 void main() {
-    // 原图直通：采样结果不做任何颜色处理。
-    gl_FragColor = texture2D(inputImageTexture, textureCoordinate);
     // demo 17
     // 左侧显示效果，右侧显示原图。
     bool isProcessedSide = textureCoordinate.x <= 0.5;

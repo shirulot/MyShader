@@ -4,8 +4,6 @@ uniform float blurStrength;
 varying vec2 textureCoordinate;
 
 void main() {
-    // 原图直通：采样结果不做任何颜色处理。
-    gl_FragColor = texture2D(inputImageTexture, textureCoordinate);
     // demo 16
     // 左侧显示效果，右侧显示原图。
     bool isProcessedSide = textureCoordinate.x <= 0.5;
