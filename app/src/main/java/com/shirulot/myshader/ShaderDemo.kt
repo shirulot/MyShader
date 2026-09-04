@@ -9,9 +9,12 @@ data class ShaderDemo(
     val fragmentShaderAsset: String,
     // 所有 Demo 默认从原图开始；未声明 whitenStrength 的 Shader 不受影响。
     val initialWhitenStrength: Float = 0f,
+    // 提亮默认关闭；未声明 brightenStrength 的 Shader 不受影响。
+    val initialBrightenStrength: Float = 0f,
     // 滑条展示按 Demo 的实际最终输出决定；归档入口 Demo 时需同步对应控制配置。
     // 渲染器仍会安全忽略未声明的 uniform。
     val showWhitenStrengthControl: Boolean = false,
+    val showBrightenStrengthControl: Boolean = false,
     val showBlurStrengthControl: Boolean = false,
     // 暖色补正滑条控制 Shader 的 warmthStrength uniform。
     val showWarmthStrengthControl: Boolean = false,
@@ -29,7 +32,7 @@ data class ShaderDemoGroup(
 /** 集中维护 Demo 顺序，避免首页和渲染页各自保存一份映射。 */
 object ShaderDemoCatalog {
     val standaloneItems: List<ShaderDemo> = listOf(
-        // 当前 main.frag 只做原图直通；三个调色 uniform 尚未参与最终输出，因此不展示无效滑条。
+        // 当前 main.frag 的两个 uniform 尚未参与最终输出，因此不展示无效滑条。
         ShaderDemo(
             R.string.demo_passthrough_title,
             R.string.demo_passthrough_description,
@@ -112,6 +115,12 @@ object ShaderDemoCatalog {
                 ShaderDemo(R.string.demo_36_title, R.string.demo_36_description, "shaders/image_input_and_color_management/demo_36_yuv_chroma_subsampling.frag"),
                 // Demo 37 归档当前 main.frag 的 RGB/YUV 往返转换版本；没有实际使用的调节 uniform，因此不展示滑条。
                 ShaderDemo(R.string.demo_37_title, R.string.demo_37_description, "shaders/image_input_and_color_management/demo_37_rgb_yuv_roundtrip.frag"),
+                // Demo 38 归档当前 main.frag 的 Gamma 亮度对比版本；没有实际使用的调节 uniform，因此不展示滑条。
+                ShaderDemo(R.string.demo_38_title, R.string.demo_38_description, "shaders/image_input_and_color_management/demo_38_gamma_brightness_comparison.frag"),
+                // Demo 39 归档当前 main.frag 的白平衡暖色校正版本；声明的调节 uniform 未参与最终输出，因此不展示滑条。
+                ShaderDemo(R.string.demo_39_title, R.string.demo_39_description, "shaders/image_input_and_color_management/demo_39_white_balance_warm_correction.frag"),
+                // Demo 40 归档白平衡与曝光补偿三栏对比；没有实际使用的调节 uniform，因此不展示滑条。
+                ShaderDemo(R.string.demo_40_title, R.string.demo_40_description, "shaders/image_input_and_color_management/demo_40_white_balance_exposure_compensation.frag"),
             ),
             initiallyExpanded = false,
         ),

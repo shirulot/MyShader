@@ -11,7 +11,9 @@
     <string name="shader_demo_source_image_original">原练习图</string>
     <string name="shader_demo_source_image_detail">新的人像</string>
     <string name="shader_demo_whiten_strength_label">美白混白值：%1$.2f</string>
-    <string name="shader_demo_whiten_strength_content_description">美白混白值，范围 0.00 到 1.00</string>
+    <string name="shader_demo_whiten_strength_content_description">美白混白值，范围 0.00 到 0.15</string>
+    <string name="shader_demo_brighten_strength_label">提亮强度：%1$.2f</string>
+    <string name="shader_demo_brighten_strength_content_description">提亮强度，范围 0.00 到 1.00</string>
     <string name="shader_demo_blur_strength_label">磨皮强度：%1$.2f</string>
     <string name="shader_demo_blur_strength_content_description">磨皮强度，范围 0.00 到 1.00</string>
     <string name="shader_demo_warmth_strength_label">暖色补正：%1$.2f</string>
@@ -31,7 +33,7 @@
     </plurals>
 
     <string name="demo_passthrough_title">原图直通</string>
-    <string name="demo_passthrough_description">不修改采样颜色，作为其他 Demo 的对照基线。</string>
+    <string name="demo_passthrough_description">当前用于继续 Shader 练习；未参与最终输出的调节 uniform 不显示滑条。</string>
     <string name="demo_01_title">Demo 1 · 固定红色</string>
     <string name="demo_01_description">保留原图透明度，将每个片元的 RGB 输出为红色。</string>
     <string name="demo_02_title">Demo 2 · UV 红绿渐变</string>
@@ -106,6 +108,12 @@
     <string name="demo_36_description">保留逐像素亮度，将色度按 24×24 网格共享后用 Y/Cb/Cr 重建 RGB，观察色度分辨率变化。</string>
     <string name="demo_37_title">Demo 37 · RGB/YUV 往返转换</string>
     <string name="demo_37_description">将输入 RGB 转换为 Y/Cb/Cr 后再还原为 RGB，观察颜色空间转换与往返误差。</string>
+    <string name="demo_38_title">Demo 38 · Gamma 亮度对比</string>
+    <string name="demo_38_description">对比编码 RGB 直接减半与先转近似线性空间再减半的结果，观察 Gamma 对亮度变化的影响。</string>
+    <string name="demo_39_title">Demo 39 · 白平衡暖色校正</string>
+    <string name="demo_39_description">模拟暖光后，以左侧中性采样点反推 RGB 校正增益，观察白平衡对暖色偏移的校正效果。</string>
+    <string name="demo_40_title">Demo 40 · 白平衡与曝光补偿</string>
+    <string name="demo_40_description">依次对比模拟色偏、白平衡校正、白平衡加曝光补偿，观察中性参考如何同时影响颜色和亮度。</string>
     <string name="demo_group_basics">基础</string>
     <string name="demo_group_whitening">美白</string>
     <string name="demo_group_skin_smoothing">磨皮</string>

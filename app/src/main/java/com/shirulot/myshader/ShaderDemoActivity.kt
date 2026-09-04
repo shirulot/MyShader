@@ -44,8 +44,16 @@ class ShaderDemoActivity : ComponentActivity() {
             EXTRA_INITIAL_WHITEN_STRENGTH,
             DEFAULT_WHITEN_STRENGTH,
         )
+        val initialBrightenStrength = intent.getFloatExtra(
+            EXTRA_INITIAL_BRIGHTEN_STRENGTH,
+            DEFAULT_BRIGHTEN_STRENGTH,
+        )
         val showWhitenStrengthControl = intent.getBooleanExtra(
             EXTRA_SHOW_WHITEN_STRENGTH_CONTROL,
+            false,
+        )
+        val showBrightenStrengthControl = intent.getBooleanExtra(
+            EXTRA_SHOW_BRIGHTEN_STRENGTH_CONTROL,
             false,
         )
         val showBlurStrengthControl = intent.getBooleanExtra(
@@ -71,6 +79,7 @@ class ShaderDemoActivity : ComponentActivity() {
         }
         // 不展示的控件仍使用默认 0.00，避免改变基础或原图直通的默认画面。
         shaderSurfaceView.setWhitenStrength(initialWhitenStrength)
+        shaderSurfaceView.setBrightenStrength(initialBrightenStrength)
         shaderSurfaceView.setBlurStrength(DEFAULT_BLUR_STRENGTH)
         shaderSurfaceView.setSaturationStrength(DEFAULT_SATURATION_STRENGTH)
 
@@ -127,6 +136,9 @@ class ShaderDemoActivity : ComponentActivity() {
             addSourceImageControl(this)
             if (showWhitenStrengthControl) {
                 addWhitenStrengthControl(this, initialWhitenStrength)
+            }
+            if (showBrightenStrengthControl) {
+                addBrightenStrengthControl(this, initialBrightenStrength)
             }
             if (showBlurStrengthControl) {
                 addBlurStrengthControl(this)
@@ -343,6 +355,46 @@ class ShaderDemoActivity : ComponentActivity() {
         )
     }
 
+    /** 将提亮强度映射为 0.00 到 1.00，并上传给 Shader uniform。 */
+    private fun addBrightenStrengthControl(panel: LinearLayout, initialValue: Float) {
+        val strengthText = TextView(this).apply {
+            setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
+            textSize = 13f
+            text = getString(R.string.shader_demo_brighten_strength_label, initialValue)
+        }
+        val strengthSeekBar = SeekBar(this).apply {
+            max = BRIGHTEN_STRENGTH_PROGRESS_MAX
+            progress = brightenStrengthToProgress(initialValue)
+            contentDescription = getString(R.string.shader_demo_brighten_strength_content_description)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                    val value = brightenStrengthFromProgress(progress)
+                    strengthText.text = getString(R.string.shader_demo_brighten_strength_label, value)
+                    // 将提亮强度上传给当前 Shader。
+                    shaderSurfaceView.setBrightenStrength(value)
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
+
+                override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
+            })
+        }
+        panel.addView(
+            strengthText,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(8) },
+        )
+        panel.addView(
+            strengthSeekBar,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+    }
+
     private fun addBlurStrengthControl(panel: LinearLayout) {
         val strengthText = TextView(this).apply {
             setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
@@ -481,20 +533,35 @@ class ShaderDemoActivity : ComponentActivity() {
         (WHITEN_STRENGTH_MIN + progress * WHITEN_STRENGTH_STEP)
             .coerceAtMost(WHITEN_STRENGTH_MAX)
 
+    private fun brightenStrengthToProgress(value: Float): Int =
+        ((value.coerceIn(BRIGHTEN_STRENGTH_MIN, BRIGHTEN_STRENGTH_MAX) - BRIGHTEN_STRENGTH_MIN) /
+                BRIGHTEN_STRENGTH_STEP).toInt()
+
+    private fun brightenStrengthFromProgress(progress: Int): Float =
+        (BRIGHTEN_STRENGTH_MIN + progress * BRIGHTEN_STRENGTH_STEP)
+            .coerceAtMost(BRIGHTEN_STRENGTH_MAX)
+
     companion object {
         private const val EXTRA_FRAGMENT_SHADER_ASSET = "fragment_shader_asset"
         private const val EXTRA_DEMO_TITLE = "demo_title"
         private const val EXTRA_INITIAL_WHITEN_STRENGTH = "initial_whiten_strength"
+        private const val EXTRA_INITIAL_BRIGHTEN_STRENGTH = "initial_brighten_strength"
         private const val EXTRA_SHOW_WHITEN_STRENGTH_CONTROL = "show_whiten_strength_control"
+        private const val EXTRA_SHOW_BRIGHTEN_STRENGTH_CONTROL = "show_brighten_strength_control"
         private const val EXTRA_SHOW_BLUR_STRENGTH_CONTROL = "show_blur_strength_control"
         private const val EXTRA_SHOW_WARMTH_STRENGTH_CONTROL = "show_warmth_strength_control"
         private const val EXTRA_SHOW_SATURATION_STRENGTH_CONTROL = "show_saturation_strength_control"
         private const val DEFAULT_FRAGMENT_SHADER_ASSET = "main.frag"
         private const val WHITEN_STRENGTH_MIN = 0f
-        private const val WHITEN_STRENGTH_MAX = 1f
+        private const val WHITEN_STRENGTH_MAX = 0.15f
         private const val WHITEN_STRENGTH_STEP = 0.01f
-        private const val WHITEN_STRENGTH_PROGRESS_MAX = 100
+        private const val WHITEN_STRENGTH_PROGRESS_MAX = 15
         private const val DEFAULT_WHITEN_STRENGTH = 0f
+        private const val BRIGHTEN_STRENGTH_MIN = 0f
+        private const val BRIGHTEN_STRENGTH_MAX = 1f
+        private const val BRIGHTEN_STRENGTH_STEP = 0.01f
+        private const val BRIGHTEN_STRENGTH_PROGRESS_MAX = 100
+        private const val DEFAULT_BRIGHTEN_STRENGTH = 0f
         private const val BLUR_STRENGTH_MIN = 0f
         private const val BLUR_STRENGTH_MAX = 1f
         private const val BLUR_STRENGTH_STEP = 0.01f
@@ -522,7 +589,9 @@ class ShaderDemoActivity : ComponentActivity() {
             fragmentShaderAsset: String,
             demoTitle: String,
             initialWhitenStrength: Float,
+            initialBrightenStrength: Float,
             showWhitenStrengthControl: Boolean,
+            showBrightenStrengthControl: Boolean,
             showBlurStrengthControl: Boolean,
             showWarmthStrengthControl: Boolean,
             showSaturationStrengthControl: Boolean,
@@ -530,7 +599,9 @@ class ShaderDemoActivity : ComponentActivity() {
             putExtra(EXTRA_FRAGMENT_SHADER_ASSET, fragmentShaderAsset)
             putExtra(EXTRA_DEMO_TITLE, demoTitle)
             putExtra(EXTRA_INITIAL_WHITEN_STRENGTH, initialWhitenStrength)
+            putExtra(EXTRA_INITIAL_BRIGHTEN_STRENGTH, initialBrightenStrength)
             putExtra(EXTRA_SHOW_WHITEN_STRENGTH_CONTROL, showWhitenStrengthControl)
+            putExtra(EXTRA_SHOW_BRIGHTEN_STRENGTH_CONTROL, showBrightenStrengthControl)
             putExtra(EXTRA_SHOW_BLUR_STRENGTH_CONTROL, showBlurStrengthControl)
             putExtra(EXTRA_SHOW_WARMTH_STRENGTH_CONTROL, showWarmthStrengthControl)
             putExtra(EXTRA_SHOW_SATURATION_STRENGTH_CONTROL, showSaturationStrengthControl)

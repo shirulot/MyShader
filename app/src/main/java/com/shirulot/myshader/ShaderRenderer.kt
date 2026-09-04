@@ -50,6 +50,10 @@ class ShaderSurfaceView(
         queueEvent { shaderRenderer.setWhitenStrength(value) }
     }
 
+    fun setBrightenStrength(value: Float) {
+        // SeekBar 回调来自主线程，uniform 状态必须在 GL 线程更新。
+        queueEvent { shaderRenderer.setBrightenStrength(value) }
+    }
 
     fun setWarmthStrength(value: Float) {
         // SeekBar 回调来自主线程，uniform 状态必须在 GL 线程更新。
@@ -114,6 +118,7 @@ private class ShaderRenderer(
     @DrawableRes
     private var sourceImageRes = R.drawable.lesson_face
     private var whitenStrength = DEFAULT_WHITEN_STRENGTH
+    private var brightenStrength = DEFAULT_BRIGHTEN_STRENGTH
 
     private var warmthStrength = DEFAULT_WARMTH_STRENGTH
     private var saturationStrength = DEFAULT_SATURATION_STRENGTH
@@ -175,6 +180,7 @@ private class ShaderRenderer(
             GLES20.glGetAttribLocation(program, "inputTextureCoordinate")
         val textureLocation = GLES20.glGetUniformLocation(program, "inputImageTexture")
         val whitenStrengthLocation = GLES20.glGetUniformLocation(program, "whitenStrength")
+        val brightenStrengthLocation = GLES20.glGetUniformLocation(program, "brightenStrength")
         val blurStrengthLocation = GLES20.glGetUniformLocation(program, "blurStrength")
         val warmthStrengthLocation = GLES20.glGetUniformLocation(program, "warmthStrength")
         val saturationStrengthLocation = GLES20.glGetUniformLocation(program, "saturationStrength")
@@ -215,6 +221,10 @@ private class ShaderRenderer(
         // 只有美白 Demo 声明 whitenStrength；其他 Shader 返回 -1，保持原有行为。
         if (whitenStrengthLocation >= 0) {
             GLES20.glUniform1f(whitenStrengthLocation, whitenStrength)
+        }
+        // 只有提亮 Shader 声明 brightenStrength；其他 Shader 返回 -1，保持原有行为。
+        if (brightenStrengthLocation >= 0) {
+            GLES20.glUniform1f(brightenStrengthLocation, brightenStrength)
         }
         // 只有磨皮声明 blurStrength；其他 Shader 返回 -1，保持原有行为。
         if (blurStrengthLocation >= 0) {
@@ -274,6 +284,10 @@ private class ShaderRenderer(
 
     fun setWhitenStrength(value: Float) {
         whitenStrength = value.coerceIn(MIN_WHITEN_STRENGTH, MAX_WHITEN_STRENGTH)
+    }
+
+    fun setBrightenStrength(value: Float) {
+        brightenStrength = value.coerceIn(MIN_BRIGHTEN_STRENGTH, MAX_BRIGHTEN_STRENGTH)
     }
 
     fun setWarmthStrength(value: Float) {
@@ -438,7 +452,10 @@ private class ShaderRenderer(
         const val TAG = "ShaderDemo"
         const val DEFAULT_WHITEN_STRENGTH = 0f
         const val MIN_WHITEN_STRENGTH = 0f
-        const val MAX_WHITEN_STRENGTH = 1f
+        const val MAX_WHITEN_STRENGTH = 0.15f
+        const val DEFAULT_BRIGHTEN_STRENGTH = 0f
+        const val MIN_BRIGHTEN_STRENGTH = 0f
+        const val MAX_BRIGHTEN_STRENGTH = 1f
 
         const val DEFAULT_WARMTH_STRENGTH = 0f
         const val MIN_WARMTH_STRENGTH = 0f
