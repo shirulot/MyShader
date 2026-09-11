@@ -107,20 +107,22 @@ object ShaderDemoCatalog {
         ShaderDemoGroup(
             titleRes = R.string.demo_group_image_input_and_color_management,
             demos = listOf(
-                // Demo 34 归档 UV 旋转与前摄镜像版本；当前没有实际使用的调节 uniform，因此不展示滑条。
-                ShaderDemo(R.string.demo_34_title, R.string.demo_34_description, "shaders/image_input_and_color_management/demo_34_uv_rotate_mirror.frag"),
-                // Demo 35 归档当前 main.frag 的 UV 方向标记版本；没有实际使用的调节 uniform，因此不展示滑条。
-                ShaderDemo(R.string.demo_35_title, R.string.demo_35_description, "shaders/image_input_and_color_management/demo_35_uv_orientation_marker.frag"),
-                // Demo 36 归档当前 main.frag 的 YUV 色度采样版本；没有实际使用的调节 uniform，因此不展示滑条。
-                ShaderDemo(R.string.demo_36_title, R.string.demo_36_description, "shaders/image_input_and_color_management/demo_36_yuv_chroma_subsampling.frag"),
-                // Demo 37 归档当前 main.frag 的 RGB/YUV 往返转换版本；没有实际使用的调节 uniform，因此不展示滑条。
-                ShaderDemo(R.string.demo_37_title, R.string.demo_37_description, "shaders/image_input_and_color_management/demo_37_rgb_yuv_roundtrip.frag"),
-                // Demo 38 归档当前 main.frag 的 Gamma 亮度对比版本；没有实际使用的调节 uniform，因此不展示滑条。
-                ShaderDemo(R.string.demo_38_title, R.string.demo_38_description, "shaders/image_input_and_color_management/demo_38_gamma_brightness_comparison.frag"),
-                // Demo 39 归档当前 main.frag 的白平衡暖色校正版本；声明的调节 uniform 未参与最终输出，因此不展示滑条。
-                ShaderDemo(R.string.demo_39_title, R.string.demo_39_description, "shaders/image_input_and_color_management/demo_39_white_balance_warm_correction.frag"),
-                // Demo 40 归档白平衡与曝光补偿三栏对比；没有实际使用的调节 uniform，因此不展示滑条。
-                ShaderDemo(R.string.demo_40_title, R.string.demo_40_description, "shaders/image_input_and_color_management/demo_40_white_balance_exposure_compensation.frag"),
+                // Demo 30 归档 UV 旋转与前摄镜像版本；当前没有实际使用的调节 uniform，因此不展示滑条。
+                ShaderDemo(R.string.demo_30_title, R.string.demo_30_description, "shaders/image_input_and_color_management/demo_30_uv_rotate_mirror.frag"),
+                // Demo 31 归档当前 main.frag 的 UV 方向标记版本；没有实际使用的调节 uniform，因此不展示滑条。
+                ShaderDemo(R.string.demo_31_title, R.string.demo_31_description, "shaders/image_input_and_color_management/demo_31_uv_orientation_marker.frag"),
+                // Demo 32 归档当前 main.frag 的 YUV 色度采样版本；没有实际使用的调节 uniform，因此不展示滑条。
+                ShaderDemo(R.string.demo_32_title, R.string.demo_32_description, "shaders/image_input_and_color_management/demo_32_yuv_chroma_subsampling.frag"),
+                // Demo 33 归档当前 main.frag 的 RGB/YUV 往返转换版本；没有实际使用的调节 uniform，因此不展示滑条。
+                ShaderDemo(R.string.demo_33_title, R.string.demo_33_description, "shaders/image_input_and_color_management/demo_33_rgb_yuv_roundtrip.frag"),
+                // Demo 34 归档当前 main.frag 的 Gamma 亮度对比版本；没有实际使用的调节 uniform，因此不展示滑条。
+                ShaderDemo(R.string.demo_34_title, R.string.demo_34_description, "shaders/image_input_and_color_management/demo_34_gamma_brightness_comparison.frag"),
+                // Demo 35 归档当前 main.frag 的白平衡暖色校正版本；声明的调节 uniform 未参与最终输出，因此不展示滑条。
+                ShaderDemo(R.string.demo_35_title, R.string.demo_35_description, "shaders/image_input_and_color_management/demo_35_white_balance_warm_correction.frag"),
+                // Demo 36 归档白平衡与曝光补偿三栏对比；没有实际使用的调节 uniform，因此不展示滑条。
+                ShaderDemo(R.string.demo_36_title, R.string.demo_36_description, "shaders/image_input_and_color_management/demo_36_white_balance_exposure_compensation.frag"),
+                // Demo 37 输出模拟偏色图及 RGB 通道灰度；调节 uniform 未参与输出，不展示滑条。
+                ShaderDemo(R.string.demo_37_title, R.string.demo_37_description, "shaders/image_input_and_color_management/demo_37_rgb_channel_debug.frag"),
             ),
             initiallyExpanded = false,
         ),
@@ -128,14 +130,20 @@ object ShaderDemoCatalog {
         ShaderDemoGroup(
             titleRes = R.string.demo_group_face_analysis_and_mask,
             demos = listOf(
-                // Demo 30 归档当前 main.frag；最终输出仅依赖人脸区域和肤色遮罩。
-                ShaderDemo(R.string.demo_30_title, R.string.demo_30_description, "shaders/face_analysis_and_mask/demo_30_face_region_mask.frag"),
-                // Demo 31 归档椭圆人脸区域版本；最终输出仍只使用人脸与肤色遮罩。
-                ShaderDemo(R.string.demo_31_title, R.string.demo_31_description, "shaders/face_analysis_and_mask/demo_31_ellipse_face_region_mask.frag"),
-                // Demo 32 归档人脸中心 uniform 版本；最终输出仍只使用人脸与肤色遮罩。
-                ShaderDemo(R.string.demo_32_title, R.string.demo_32_description, "shaders/face_analysis_and_mask/demo_32_face_center_mask.frag"),
-                // Demo 33 归档人脸包围盒版本；调色 uniform 未参与最终输出，因此不展示滑条。
-                ShaderDemo(R.string.demo_33_title, R.string.demo_33_description, "shaders/face_analysis_and_mask/demo_33_face_bounding_box_mask.frag"),
+                // Demo 38 用四条 UV 边界输出矩形遮罩；调节 uniform 未参与输出，不展示滑条。
+                ShaderDemo(R.string.demo_38_title, R.string.demo_38_description, "shaders/face_analysis_and_mask/demo_38_rectangular_region_mask.frag"),
+                // Demo 39 用 smoothstep 羽化矩形边缘；调节 uniform 未参与输出，不展示滑条。
+                ShaderDemo(R.string.demo_39_title, R.string.demo_39_description, "shaders/face_analysis_and_mask/demo_39_feathered_rectangle_mask.frag"),
+                // Demo 40 用羽化矩形遮罩混合固定提亮结果；调节 uniform 未参与输出，不展示滑条。
+                ShaderDemo(R.string.demo_40_title, R.string.demo_40_description, "shaders/face_analysis_and_mask/demo_40_feathered_rectangle_brightening.frag"),
+                // Demo 41 输出 HSV 肤色候选灰度遮罩；调节 uniform 未参与输出，不展示滑条。
+                ShaderDemo(R.string.demo_41_title, R.string.demo_41_description, "shaders/face_analysis_and_mask/demo_41_hsv_skin_candidate_mask.frag"),
+                // Demo 42 联合 HSV 肤色候选与羽化矩形区域；调节 uniform 未参与输出，不展示滑条。
+                ShaderDemo(R.string.demo_42_title, R.string.demo_42_description, "shaders/face_analysis_and_mask/demo_42_skin_region_combined_mask.frag"),
+                // Demo 43 使用手工中心和宽高显示人脸框；调节 uniform 未参与输出，不展示滑条。
+                ShaderDemo(R.string.demo_43_title, R.string.demo_43_description, "shaders/face_analysis_and_mask/demo_43_manual_face_box_mask.frag"),
+                // Demo 44 将模拟像素坐标转为 UV 并标记红点；调节 uniform 未参与输出，不展示滑条。
+                ShaderDemo(R.string.demo_44_title, R.string.demo_44_description, "shaders/face_analysis_and_mask/demo_44_pixel_to_uv_marker.frag"),
             ),
             initiallyExpanded = false,
         ),

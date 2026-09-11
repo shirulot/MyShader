@@ -40,12 +40,8 @@ void main() {
     vec2 analysisImageSize = vec2(1024.0, 1536.0);
     // 将像素坐标转换为 0--1 纹理坐标。
     vec2 texturePoint = analysisPointPx / analysisImageSize;
-
-    // 把关键点与当前片元的 UV 差转换成像素距离。
-    vec2 pointDeltaPx = (textureCoordinate - texturePoint) * analysisImageSize;
-    float pointDistancePx = length(pointDeltaPx);
-    // 使用相同的像素半径，避免非正方形图片把圆拉成椭圆。
-    float pointWeight = 1.0 - smoothstep(15.0, 20.0, pointDistancePx);
+    // 将转换后的关键点显示为红色圆点。
+    float pointWeight = 1.0 - smoothstep(0.015, 0.020, distance(textureCoordinate, texturePoint));
     vec3 debugColor = mix(sourceColor.rgb, vec3(1.0, 0.0, 0.0), pointWeight);
     gl_FragColor = vec4(debugColor, sourceColor.a);
 

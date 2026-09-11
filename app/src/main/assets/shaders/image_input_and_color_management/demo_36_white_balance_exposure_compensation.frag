@@ -29,7 +29,7 @@ const float TARGET_WHITE_LUMA = 1.0;
 // 仅用于教学：返回受到模拟光照色偏后的颜色。
 vec3 simulateColorCast(vec3 sourceRgb) {
     vec3 sourceLinear = pow(sourceRgb, vec3(2.2));
-    vec3 simulatedLightGain = vec3(0.8, 0.9, 0.3);
+    vec3 simulatedLightGain = vec3(0.3, 0.5, 0.2);
     vec3 observedLinear = sourceLinear * simulatedLightGain;
     return pow(clamp(observedLinear, 0.0, 1.0), vec3(1.0 / 2.2));
 }
@@ -65,7 +65,7 @@ void main() {
     vec3 whiteBalanceGain = vec3(observedNeutralLinear.g) / max(observedNeutralLinear, vec3(0.001));
 
     // 白平衡校正偏色后的整张图。意义为 绿通道的校正增益为 1.0时的颜色
-    // 如果当前是白色 (1，1，1) 结果则为 (1.66, 1, 2.5)
+    // 理解三色通道乘 (1.66, 1, 2.5) 倍
     vec3 correctedLinear = observedLinear * whiteBalanceGain;
     // 计算中性参考点经过白平衡后还剩多少亮度。
     // 此时 这里的答案一定是 vec3(green,green,green) 如果是上面假设的green=0.5则为 (0.5, 0.5, 0.5)。
@@ -74,9 +74,11 @@ void main() {
     // 曝光目标来自“参考点已知为白色”的外部前提，不读取加光前的参考点。
     // 计算白平衡之后的 Y luminance。这个值 一定是observedNeutralLinear.g
     float correctedLuma = dot(correctedNeutralLinear, lightRec709);
-    // 曝光补偿：目标亮度除以当前亮度。
+    // 曝光补偿：目标亮度除以当前亮度。实际是白平衡中亮度倍补到1了 需要取到原本1和绿的差倍
     float exposureGain = TARGET_WHITE_LUMA / max(correctedLuma, 0.001);
+    // 原本1和绿的差倍 去*白平衡后的原图 做曝光补正
     vec3 restoredLinear = correctedLinear * exposureGain;
+    // 防止溢出 然后做gamma反码
     vec3 restoredRgb = pow(clamp(restoredLinear, 0.0, 1.0), vec3(1.0 / 2.2));
 
     // 左：模拟色偏；中：只做白平衡；右：白平衡加曝光补偿。
@@ -85,6 +87,7 @@ void main() {
     // 学习笔记：所以这里拿比例去还原 RGB 是为什么？
     // 答：比例已在 correctedLinear 中完成偏色校正，pow(1.0 / 2.2) 只负责转回屏幕编码。
     vec3 correctedRgb = pow(clamp(correctedLinear, 0.0, 1.0), vec3(1.0 / 2.2));
+    //
     vec3 outputRgb = mix(observedRgb, correctedRgb, showWhiteBalance);
     outputRgb = mix(outputRgb, restoredRgb, showExposure);
 

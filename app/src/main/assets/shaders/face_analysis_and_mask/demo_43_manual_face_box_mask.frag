@@ -34,21 +34,21 @@ float getSaturation(vec3 color);
 void main() {
     // 模拟输入准备区：允许读取加光前的原图。
     vec4 sourceColor = texture2D(inputImageTexture, textureCoordinate);
-    // 模拟分析工具返回的图片像素坐标。
-    vec2 analysisPointPx = vec2(410.0, 645.0);
-    // 当前输入图片的真实像素尺寸。
-    vec2 analysisImageSize = vec2(1024.0, 1536.0);
-    // 将像素坐标转换为 0--1 纹理坐标。
-    vec2 texturePoint = analysisPointPx / analysisImageSize;
+    // 手工模拟外部分析给出的人脸框中心和宽高。
+    vec2 manualFaceCenter = vec2(0.50, 0.50);
+    vec2 manualFaceSize = vec2(0.50, 0.60);
+    // 根据中心和宽高计算人脸框的最小、最大边界。
+    vec2 faceMin = manualFaceCenter - manualFaceSize * 0.5;
+    vec2 faceMax = manualFaceCenter + manualFaceSize * 0.5;
+    // 判断当前像素是否位于手工人脸框内。
+    //脸部边界左边是否在当前片元的左边 是的话为1 不是的话为0  说明当前片元超出了 左边界 其余的大体意思相近 过滤掉上下左右不在框框内的片元 如果最后片元在框框范围内则为1 否则为0
+    float faceBoxWeight = step(faceMin.x, textureCoordinate.x)
+        * (1.0 - step(faceMax.x, textureCoordinate.x))
+        * step(faceMin.y, textureCoordinate.y)
+        * (1.0 - step(faceMax.y, textureCoordinate.y));
 
-    // 把关键点与当前片元的 UV 差转换成像素距离。
-    vec2 pointDeltaPx = (textureCoordinate - texturePoint) * analysisImageSize;
-    float pointDistancePx = length(pointDeltaPx);
-    // 使用相同的像素半径，避免非正方形图片把圆拉成椭圆。
-    float pointWeight = 1.0 - smoothstep(15.0, 20.0, pointDistancePx);
-    vec3 debugColor = mix(sourceColor.rgb, vec3(1.0, 0.0, 0.0), pointWeight);
-    gl_FragColor = vec4(debugColor, sourceColor.a);
-
+    // 直接显示手工人脸框，不使用任何 SDK 数据。
+    gl_FragColor = vec4(vec3(faceBoxWeight), sourceColor.a);
 }
 // 详细查看 [res/drawable/hue_color_ring.png]
 // 将 RGB 转换为 0--1 范围的 HSV 色相 H。
