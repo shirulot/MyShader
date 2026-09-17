@@ -11,10 +11,13 @@ data class ShaderDemo(
     val initialWhitenStrength: Float = 0f,
     // 提亮默认关闭；未声明 brightenStrength 的 Shader 不受影响。
     val initialBrightenStrength: Float = 0f,
+    // 主练习的黑眼圈提亮系数默认从 0.12 开始。
+    val initialBlackCircleStrength: Float = 0.12f,
     // 滑条展示按 Demo 的实际最终输出决定；归档入口 Demo 时需同步对应控制配置。
     // 渲染器仍会安全忽略未声明的 uniform。
     val showWhitenStrengthControl: Boolean = false,
     val showBrightenStrengthControl: Boolean = false,
+    val showBlackCircleStrengthControl: Boolean = false,
     val showBlurStrengthControl: Boolean = false,
     // 暖色补正滑条控制 Shader 的 warmthStrength uniform。
     val showWarmthStrengthControl: Boolean = false,
@@ -32,11 +35,13 @@ data class ShaderDemoGroup(
 /** 集中维护 Demo 顺序，避免首页和渲染页各自保存一份映射。 */
 object ShaderDemoCatalog {
     val standaloneItems: List<ShaderDemo> = listOf(
-        // 当前 main.frag 的两个 uniform 尚未参与最终输出，因此不展示无效滑条。
+        // 当前 main.frag 的黑眼圈 uniform 参与下眼区域提亮计算，因此展示对应滑条。
         ShaderDemo(
             R.string.demo_passthrough_title,
             R.string.demo_passthrough_description,
             "main.frag",
+            initialBlackCircleStrength = 0.12f,
+            showBlackCircleStrengthControl = true,
         ),
     )
 
@@ -144,6 +149,28 @@ object ShaderDemoCatalog {
                 ShaderDemo(R.string.demo_43_title, R.string.demo_43_description, "shaders/face_analysis_and_mask/demo_43_manual_face_box_mask.frag"),
                 // Demo 44 将模拟像素坐标转为 UV 并标记红点；调节 uniform 未参与输出，不展示滑条。
                 ShaderDemo(R.string.demo_44_title, R.string.demo_44_description, "shaders/face_analysis_and_mask/demo_44_pixel_to_uv_marker.frag"),
+                // Demo 45 显示手工左眼中心的归一化椭圆距离；调节 uniform 未参与输出，不展示滑条。
+                ShaderDemo(R.string.demo_45_title, R.string.demo_45_description, "shaders/face_analysis_and_mask/demo_45_eye_ellipse_distance.frag"),
+                // Demo 46 只保留 main 方法及其实际引用的纹理和坐标声明；调节 uniform 未参与输出，不展示滑条。
+                ShaderDemo(R.string.demo_46_title, R.string.demo_46_description, "shaders/face_analysis_and_mask/demo_46_bilateral_eye_ellipse_mask.frag"),
+                // Demo 47 只保留 main 方法及其实际调用的脸框、五官和肤色候选依赖；调节 uniform 未参与输出，不展示滑条。
+                ShaderDemo(R.string.demo_47_title, R.string.demo_47_description, "shaders/face_analysis_and_mask/demo_47_protected_face_skin_mask.frag"),
+                // Demo 48 覆盖为当前 main.frag 的练习；最终输出使用黑眼圈强度，因此只显示对应滑条。
+                ShaderDemo(
+                    R.string.demo_48_title,
+                    R.string.demo_48_description,
+                    "shaders/face_analysis_and_mask/demo_48_under_eye_black_circle_brightening.frag",
+                    initialBlackCircleStrength = 0.12f,
+                    showBlackCircleStrengthControl = true,
+                ),
+                // Demo 49 使用 SDK 双眼中心与半径；最终输出受黑眼圈强度控制，因此保留对应滑条。
+                ShaderDemo(
+                    R.string.demo_49_title,
+                    R.string.demo_49_description,
+                    "shaders/face_analysis_and_mask/demo_49_sdk_eye_under_eye_brightening.frag",
+                    initialBlackCircleStrength = 0.12f,
+                    showBlackCircleStrengthControl = true,
+                ),
             ),
             initiallyExpanded = false,
         ),

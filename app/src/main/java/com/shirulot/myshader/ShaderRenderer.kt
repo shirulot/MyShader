@@ -55,6 +55,11 @@ class ShaderSurfaceView(
         queueEvent { shaderRenderer.setBrightenStrength(value) }
     }
 
+    fun setBlackCircleStrength(value: Float) {
+        // 黑眼圈 SeekBar 回调来自主线程，uniform 状态必须在 GL 线程更新。
+        queueEvent { shaderRenderer.setBlackCircleStrength(value) }
+    }
+
     fun setWarmthStrength(value: Float) {
         // SeekBar 回调来自主线程，uniform 状态必须在 GL 线程更新。
         queueEvent { shaderRenderer.setWarmthStrength(value) }
@@ -75,6 +80,21 @@ class ShaderSurfaceView(
         queueEvent { shaderRenderer.setSourceImage(sourceImageRes) }
     }
 
+    fun setEyeRegions(leftEyeRegion: FaceFeatureRegion, rightEyeRegion: FaceFeatureRegion) {
+        // 人脸分析结果统一在 GL 线程更新。
+        queueEvent { shaderRenderer.setEyeRegions(leftEyeRegion, rightEyeRegion) }
+    }
+
+    fun setLipRegions(lipRegion: FaceFeatureRegion) {
+        // 人脸分析结果统一在 GL 线程更新。
+        queueEvent { shaderRenderer.setLipRegions(lipRegion) }
+    }
+
+    fun clearFaceAnalysis() {
+        // 检测失败后在 GL 线程关闭所有依赖人脸区域的效果。
+        queueEvent { shaderRenderer.clearFaceAnalysis() }
+    }
+
 }
 
 private class ShaderRenderer(
@@ -91,6 +111,10 @@ private class ShaderRenderer(
     private var faceCenterY = 0.5f
     private var faceWidth = 0.3f
     private var faceHeight = 0.4f
+
+    private var leftEyeRegion = FaceFeatureRegion(FacePoint(0.36f, 0.41f), FacePoint(0.062f, 0.016f))
+    private var rightEyeRegion = FaceFeatureRegion(FacePoint(0.65f, 0.41f), FacePoint(0.062f, 0.016f))
+    private var lipRegion = FaceFeatureRegion(FacePoint(0.50f, 0.62f), FacePoint(0.112f, 0.029f))
     private val mainHandler = Handler(Looper.getMainLooper())
     private val positionBuffer = createFloatBuffer(
         floatArrayOf(
@@ -119,6 +143,7 @@ private class ShaderRenderer(
     private var sourceImageRes = R.drawable.lesson_face
     private var whitenStrength = DEFAULT_WHITEN_STRENGTH
     private var brightenStrength = DEFAULT_BRIGHTEN_STRENGTH
+    private var blackCircleStrength = DEFAULT_BLACK_CIRCLE_STRENGTH
 
     private var warmthStrength = DEFAULT_WARMTH_STRENGTH
     private var saturationStrength = DEFAULT_SATURATION_STRENGTH
@@ -181,12 +206,22 @@ private class ShaderRenderer(
         val textureLocation = GLES20.glGetUniformLocation(program, "inputImageTexture")
         val whitenStrengthLocation = GLES20.glGetUniformLocation(program, "whitenStrength")
         val brightenStrengthLocation = GLES20.glGetUniformLocation(program, "brightenStrength")
+        val blackCircleStrengthLocation = GLES20.glGetUniformLocation(program, "blackCircleStrength")
         val blurStrengthLocation = GLES20.glGetUniformLocation(program, "blurStrength")
         val warmthStrengthLocation = GLES20.glGetUniformLocation(program, "warmthStrength")
         val saturationStrengthLocation = GLES20.glGetUniformLocation(program, "saturationStrength")
         val faceCenterLocation = GLES20.glGetUniformLocation(program, "faceCenter")
         val faceCenterReadyLocation = GLES20.glGetUniformLocation(program, "faceCenterReady")
         val faceSizeLocation = GLES20.glGetUniformLocation(program, "faceSize")
+
+        val leftEyeRadiusLocation = GLES20.glGetUniformLocation(program, "leftEyeRadius")
+        val rightEyeRadiusLocation = GLES20.glGetUniformLocation(program, "rightEyeRadius")
+
+        val leftEyeCenterLocation = GLES20.glGetUniformLocation(program, "leftEyeCenter")
+        val rightEyeCenterLocation = GLES20.glGetUniformLocation(program, "rightEyeCenter")
+
+        val lipCenterLocation = GLES20.glGetUniformLocation(program, "lipCenter")
+        val lipRadiusLocation = GLES20.glGetUniformLocation(program, "lipRadius")
 
         if (positionLocation < 0 || textureCoordinateLocation < 0 || textureLocation < 0) {
             postStatus(context.getString(R.string.shader_demo_status_interface_error))
@@ -226,6 +261,10 @@ private class ShaderRenderer(
         if (brightenStrengthLocation >= 0) {
             GLES20.glUniform1f(brightenStrengthLocation, brightenStrength)
         }
+        // 只有声明 blackCircleStrength 的 Shader 才接收黑眼圈提亮系数。
+        if (blackCircleStrengthLocation >= 0) {
+            GLES20.glUniform1f(blackCircleStrengthLocation, blackCircleStrength)
+        }
         // 只有磨皮声明 blurStrength；其他 Shader 返回 -1，保持原有行为。
         if (blurStrengthLocation >= 0) {
             GLES20.glUniform1f(blurStrengthLocation, blurStrength)
@@ -243,6 +282,13 @@ private class ShaderRenderer(
         if (faceCenterLocation >= 0) {
             GLES20.glUniform2f(faceCenterLocation, faceCenterX, faceCenterY)
         }
+
+        if (leftEyeCenterLocation >= 0) GLES20.glUniform2f(leftEyeCenterLocation, leftEyeRegion.center.x, leftEyeRegion.center.y)
+        if (rightEyeCenterLocation >= 0) GLES20.glUniform2f(rightEyeCenterLocation, rightEyeRegion.center.x, rightEyeRegion.center.y)
+        if (leftEyeRadiusLocation >= 0) GLES20.glUniform2f(leftEyeRadiusLocation, leftEyeRegion.radius.x, leftEyeRegion.radius.y)
+        if (rightEyeRadiusLocation >= 0) GLES20.glUniform2f(rightEyeRadiusLocation, rightEyeRegion.radius.x, rightEyeRegion.radius.y)
+        if (lipRadiusLocation >= 0) GLES20.glUniform2f(lipRadiusLocation, lipRegion.radius.x, lipRegion.radius.y)
+        if (lipCenterLocation >= 0) GLES20.glUniform2f(lipCenterLocation, lipRegion.center.x, lipRegion.center.y)
 
         if (faceCenterReadyLocation >= 0) {
             GLES20.glUniform1f(faceCenterReadyLocation, if (faceCenterReady) 1f else 0f)
@@ -288,6 +334,10 @@ private class ShaderRenderer(
 
     fun setBrightenStrength(value: Float) {
         brightenStrength = value.coerceIn(MIN_BRIGHTEN_STRENGTH, MAX_BRIGHTEN_STRENGTH)
+    }
+
+    fun setBlackCircleStrength(value: Float) {
+        blackCircleStrength = value.coerceIn(MIN_BLACK_CIRCLE_STRENGTH, MAX_BLACK_CIRCLE_STRENGTH)
     }
 
     fun setWarmthStrength(value: Float) {
@@ -448,6 +498,18 @@ private class ShaderRenderer(
                 position(0)
             }
 
+    fun setEyeRegions(leftEyeRegion: FaceFeatureRegion, rightEyeRegion: FaceFeatureRegion) {
+        this.leftEyeRegion = leftEyeRegion
+        this.rightEyeRegion = rightEyeRegion
+    }
+    fun setLipRegions(lipRegion: FaceFeatureRegion) {
+        this.lipRegion = lipRegion
+    }
+
+    fun clearFaceAnalysis() {
+        faceCenterReady = false
+    }
+
     private companion object {
         const val TAG = "ShaderDemo"
         const val DEFAULT_WHITEN_STRENGTH = 0f
@@ -456,6 +518,9 @@ private class ShaderRenderer(
         const val DEFAULT_BRIGHTEN_STRENGTH = 0f
         const val MIN_BRIGHTEN_STRENGTH = 0f
         const val MAX_BRIGHTEN_STRENGTH = 1f
+        const val DEFAULT_BLACK_CIRCLE_STRENGTH = 0.12f
+        const val MIN_BLACK_CIRCLE_STRENGTH = 0f
+        const val MAX_BLACK_CIRCLE_STRENGTH = 0.15f
 
         const val DEFAULT_WARMTH_STRENGTH = 0f
         const val MIN_WARMTH_STRENGTH = 0f

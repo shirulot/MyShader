@@ -48,12 +48,20 @@ class ShaderDemoActivity : ComponentActivity() {
             EXTRA_INITIAL_BRIGHTEN_STRENGTH,
             DEFAULT_BRIGHTEN_STRENGTH,
         )
+        val initialBlackCircleStrength = intent.getFloatExtra(
+            EXTRA_INITIAL_BLACK_CIRCLE_STRENGTH,
+            DEFAULT_BLACK_CIRCLE_STRENGTH,
+        )
         val showWhitenStrengthControl = intent.getBooleanExtra(
             EXTRA_SHOW_WHITEN_STRENGTH_CONTROL,
             false,
         )
         val showBrightenStrengthControl = intent.getBooleanExtra(
             EXTRA_SHOW_BRIGHTEN_STRENGTH_CONTROL,
+            false,
+        )
+        val showBlackCircleStrengthControl = intent.getBooleanExtra(
+            EXTRA_SHOW_BLACK_CIRCLE_STRENGTH_CONTROL,
             false,
         )
         val showBlurStrengthControl = intent.getBooleanExtra(
@@ -80,19 +88,40 @@ class ShaderDemoActivity : ComponentActivity() {
         // 不展示的控件仍使用默认 0.00，避免改变基础或原图直通的默认画面。
         shaderSurfaceView.setWhitenStrength(initialWhitenStrength)
         shaderSurfaceView.setBrightenStrength(initialBrightenStrength)
+        shaderSurfaceView.setBlackCircleStrength(initialBlackCircleStrength)
         shaderSurfaceView.setBlurStrength(DEFAULT_BLUR_STRENGTH)
         shaderSurfaceView.setSaturationStrength(DEFAULT_SATURATION_STRENGTH)
 
         GlobalScope.launch(IO) {
-            val landmarks = FaceAnalysis.detectLessonFace(resources)
-            val faceCenterRegion = FaceAnalysis.calculateFaceRegion(landmarks)
-            shaderSurfaceView.setFaceCenterRegion(
-                faceCenterRegion.centerX,
-                faceCenterRegion.centerY,
-                faceCenterRegion.width,
-                faceCenterRegion.height
-            )
-            Log.i("FaceAnalysis", "pointCount=${landmarks.size / 2}, center=$faceCenterRegion")
+            try {
+                // 初始化人脸关键点；数据无效时关闭所有依赖人脸区域的 Shader 效果。
+                val landmarks = FaceAnalysis.detectLessonFace(resources)
+                if (!FaceAnalysis.hasValidLandmarks(landmarks)) {
+                    shaderSurfaceView.clearFaceAnalysis()
+                    Log.w("FaceAnalysis", "未检测到完整有效的人脸关键点")
+                    return@launch
+                }
+
+                // 从同一份有效关键点中计算人脸、双眼和嘴唇区域。
+                val faceCenterRegion = FaceAnalysis.calculateFaceRegion(landmarks)
+                val (leftEyeRegion, rightEyeRegion) = FaceAnalysis.calculateEyeRegions(landmarks)
+                val lipRegion = FaceAnalysis.calculateLipRegion(landmarks)
+
+                shaderSurfaceView.setFaceCenterRegion(
+                    faceCenterRegion.centerX,
+                    faceCenterRegion.centerY,
+                    faceCenterRegion.width,
+                    faceCenterRegion.height,
+                )
+                shaderSurfaceView.setEyeRegions(leftEyeRegion, rightEyeRegion)
+                shaderSurfaceView.setLipRegions(lipRegion)
+                Log.i("FaceAnalysis", "lipRegion=$lipRegion")
+                Log.i("FaceAnalysis", "leftEye=$leftEyeRegion, rightEye=$rightEyeRegion")
+                Log.i("FaceAnalysis", "pointCount=${landmarks.size / 2}, center=$faceCenterRegion")
+            } catch (error: Exception) {
+                shaderSurfaceView.clearFaceAnalysis()
+                Log.e("FaceAnalysis", "人脸分析失败", error)
+            }
         }
         val root = FrameLayout(this).apply {
             setBackgroundColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_background))
@@ -139,6 +168,9 @@ class ShaderDemoActivity : ComponentActivity() {
             }
             if (showBrightenStrengthControl) {
                 addBrightenStrengthControl(this, initialBrightenStrength)
+            }
+            if (showBlackCircleStrengthControl) {
+                addBlackCircleStrengthControl(this, initialBlackCircleStrength)
             }
             if (showBlurStrengthControl) {
                 addBlurStrengthControl(this)
@@ -395,6 +427,46 @@ class ShaderDemoActivity : ComponentActivity() {
         )
     }
 
+    /** 将黑眼圈提亮系数映射为 0.00 到 0.15，并上传给 Shader uniform。 */
+    private fun addBlackCircleStrengthControl(panel: LinearLayout, initialValue: Float) {
+        val strengthText = TextView(this).apply {
+            setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
+            textSize = 13f
+            text = getString(R.string.shader_demo_black_circle_strength_label, initialValue)
+        }
+        val strengthSeekBar = SeekBar(this).apply {
+            max = BLACK_CIRCLE_STRENGTH_PROGRESS_MAX
+            progress = blackCircleStrengthToProgress(initialValue)
+            contentDescription = getString(R.string.shader_demo_black_circle_strength_content_description)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                    val value = blackCircleStrengthFromProgress(progress)
+                    strengthText.text = getString(R.string.shader_demo_black_circle_strength_label, value)
+                    // 将黑眼圈提亮系数上传给当前 Shader。
+                    shaderSurfaceView.setBlackCircleStrength(value)
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
+
+                override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
+            })
+        }
+        panel.addView(
+            strengthText,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(8) },
+        )
+        panel.addView(
+            strengthSeekBar,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+    }
+
     private fun addBlurStrengthControl(panel: LinearLayout) {
         val strengthText = TextView(this).apply {
             setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
@@ -541,13 +613,23 @@ class ShaderDemoActivity : ComponentActivity() {
         (BRIGHTEN_STRENGTH_MIN + progress * BRIGHTEN_STRENGTH_STEP)
             .coerceAtMost(BRIGHTEN_STRENGTH_MAX)
 
+    private fun blackCircleStrengthToProgress(value: Float): Int =
+        ((value.coerceIn(BLACK_CIRCLE_STRENGTH_MIN, BLACK_CIRCLE_STRENGTH_MAX) - BLACK_CIRCLE_STRENGTH_MIN) /
+                BLACK_CIRCLE_STRENGTH_STEP).toInt()
+
+    private fun blackCircleStrengthFromProgress(progress: Int): Float =
+        (BLACK_CIRCLE_STRENGTH_MIN + progress * BLACK_CIRCLE_STRENGTH_STEP)
+            .coerceAtMost(BLACK_CIRCLE_STRENGTH_MAX)
+
     companion object {
         private const val EXTRA_FRAGMENT_SHADER_ASSET = "fragment_shader_asset"
         private const val EXTRA_DEMO_TITLE = "demo_title"
         private const val EXTRA_INITIAL_WHITEN_STRENGTH = "initial_whiten_strength"
         private const val EXTRA_INITIAL_BRIGHTEN_STRENGTH = "initial_brighten_strength"
+        private const val EXTRA_INITIAL_BLACK_CIRCLE_STRENGTH = "initial_black_circle_strength"
         private const val EXTRA_SHOW_WHITEN_STRENGTH_CONTROL = "show_whiten_strength_control"
         private const val EXTRA_SHOW_BRIGHTEN_STRENGTH_CONTROL = "show_brighten_strength_control"
+        private const val EXTRA_SHOW_BLACK_CIRCLE_STRENGTH_CONTROL = "show_black_circle_strength_control"
         private const val EXTRA_SHOW_BLUR_STRENGTH_CONTROL = "show_blur_strength_control"
         private const val EXTRA_SHOW_WARMTH_STRENGTH_CONTROL = "show_warmth_strength_control"
         private const val EXTRA_SHOW_SATURATION_STRENGTH_CONTROL = "show_saturation_strength_control"
@@ -562,6 +644,11 @@ class ShaderDemoActivity : ComponentActivity() {
         private const val BRIGHTEN_STRENGTH_STEP = 0.01f
         private const val BRIGHTEN_STRENGTH_PROGRESS_MAX = 100
         private const val DEFAULT_BRIGHTEN_STRENGTH = 0f
+        private const val BLACK_CIRCLE_STRENGTH_MIN = 0f
+        private const val BLACK_CIRCLE_STRENGTH_MAX = 0.15f
+        private const val BLACK_CIRCLE_STRENGTH_STEP = 0.01f
+        private const val BLACK_CIRCLE_STRENGTH_PROGRESS_MAX = 15
+        private const val DEFAULT_BLACK_CIRCLE_STRENGTH = 0.12f
         private const val BLUR_STRENGTH_MIN = 0f
         private const val BLUR_STRENGTH_MAX = 1f
         private const val BLUR_STRENGTH_STEP = 0.01f
@@ -590,8 +677,10 @@ class ShaderDemoActivity : ComponentActivity() {
             demoTitle: String,
             initialWhitenStrength: Float,
             initialBrightenStrength: Float,
+            initialBlackCircleStrength: Float,
             showWhitenStrengthControl: Boolean,
             showBrightenStrengthControl: Boolean,
+            showBlackCircleStrengthControl: Boolean,
             showBlurStrengthControl: Boolean,
             showWarmthStrengthControl: Boolean,
             showSaturationStrengthControl: Boolean,
@@ -600,8 +689,10 @@ class ShaderDemoActivity : ComponentActivity() {
             putExtra(EXTRA_DEMO_TITLE, demoTitle)
             putExtra(EXTRA_INITIAL_WHITEN_STRENGTH, initialWhitenStrength)
             putExtra(EXTRA_INITIAL_BRIGHTEN_STRENGTH, initialBrightenStrength)
+            putExtra(EXTRA_INITIAL_BLACK_CIRCLE_STRENGTH, initialBlackCircleStrength)
             putExtra(EXTRA_SHOW_WHITEN_STRENGTH_CONTROL, showWhitenStrengthControl)
             putExtra(EXTRA_SHOW_BRIGHTEN_STRENGTH_CONTROL, showBrightenStrengthControl)
+            putExtra(EXTRA_SHOW_BLACK_CIRCLE_STRENGTH_CONTROL, showBlackCircleStrengthControl)
             putExtra(EXTRA_SHOW_BLUR_STRENGTH_CONTROL, showBlurStrengthControl)
             putExtra(EXTRA_SHOW_WARMTH_STRENGTH_CONTROL, showWarmthStrengthControl)
             putExtra(EXTRA_SHOW_SATURATION_STRENGTH_CONTROL, showSaturationStrengthControl)

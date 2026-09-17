@@ -1,20 +1,6 @@
 precision mediump float;
 uniform sampler2D inputImageTexture;
-uniform float whitenStrength;
-
-// 黑眼圈滑条控制下眼区域的提亮幅度。
-uniform float blackCircleStrength;
 varying vec2 textureCoordinate;
-
-// SDK 眼部轮廓计算出的原始半径。
-uniform vec2 leftEyeRadius;
-uniform vec2 rightEyeRadius;
-// SDK 检测得到的左右眼中心。
-uniform vec2 leftEyeCenter;
-uniform vec2 rightEyeCenter;
-
-//取亮度 RC709
-vec3 lightRec709 = vec3(0.2126, 0.7152, 0.0722);
 
 // 外部分析得到的人脸框中心。
 uniform vec2 faceCenter;
@@ -23,6 +9,9 @@ uniform vec2 faceSize;
 // 标记当前人脸框数据是否可用。
 uniform float faceCenterReady;
 
+// hue 肤色判断
+float SKIN_HUE_START = 0.08;
+float SKIN_HUE_END = 0.14;
 
 // 有效高光带
 float HIGHTLIGHT_START = 0.65;
@@ -31,19 +20,8 @@ float HIGHTLIGHT_END = 0.9;
 float SHADOW_START = 0.1;
 float SHADOW_END = 0.3;
 
-// hue 肤色色相判断
-float SKIN_HUE_START = 0.08;
-float SKIN_HUE_END = 0.14;
-
-// Saturation 肤色饱和度判断
 float SKIN_SATURATION_START = 0.08;
 float SKIN_SATURATION_END = 0.20;
-
-float eyeXRatio = 2.0;
-float eyeYRatio = 4.5;
-// SDK 外唇轮廓计算出的中心和半径。
-uniform vec2 lipCenter;
-uniform vec2 lipRadius;
 
 float getHue(vec3 color);
 float getSaturation(vec3 color);
@@ -73,7 +51,6 @@ float getZoneWeight(vec2 center, vec2 radius){
     return 1.0 - smoothstep(0.75, 1.0, zoneDistance);
 }
 
-// 获取皮肤颜色权重
 float getSkinCandidateWeight(vec3 color) {
     float hue = getHue(color);
     float saturation = getSaturation(color);
@@ -89,20 +66,26 @@ float getSkinCandidateWeight(vec3 color) {
     float shadowWeight = smoothstep(SHADOW_START, SHADOW_END, value);
     float highlightWeight = 1.0 - smoothstep(HIGHTLIGHT_START, HIGHTLIGHT_END, value);
 
-
     return hueWeight * saturationWeight * shadowWeight * highlightWeight;
 }
 
 void main() {
     // 模拟输入准备区：允许读取加光前的原图。
     vec4 sourceColor = texture2D(inputImageTexture, textureCoordinate);
-    // 原始轮廓只包含眼睛本体，扩张后作为眼周处理范围。
-    vec2 leftEyeMaskRadius = leftEyeRadius * vec2(eyeXRatio, eyeYRatio);
-    vec2 rightEyeMaskRadius = rightEyeRadius * vec2(eyeXRatio,eyeYRatio);
+    // 手工指定左眼中心。
+    vec2 leftEyeCenter = vec2(0.36, 0.41);
+    vec2 rightEyeCenter = vec2(0.65, 0.41);
+    // 分别控制椭圆的横向半径和纵向半径。
+    vec2 eyeRadius = vec2(0.12, 0.055);
+
+    // 嘴唇中心点
+    vec2 lipCenter = vec2(0.50, 0.65);
+    // 嘴唇的椭圆半径
+    vec2 lipRadius = vec2(0.13, 0.045);
 
     float lipWeight = getZoneWeight(lipCenter, lipRadius);
-    float leftEyeWeight = getZoneWeight(leftEyeCenter, leftEyeMaskRadius);
-    float rightEyeWeight = getZoneWeight(rightEyeCenter, rightEyeMaskRadius);
+    float leftEyeWeight = getZoneWeight(leftEyeCenter, eyeRadius);
+    float rightEyeWeight = getZoneWeight(rightEyeCenter, eyeRadius);
     // 如果在其中一个区域内 则会返回有值
     float featureWeight = max(max(leftEyeWeight, rightEyeWeight), lipWeight);
     // 反转五官权重，眼睛和嘴唇变为受保护区域。
@@ -118,22 +101,9 @@ void main() {
     // 同时满足：属于肤色、在人脸框内、不在眼睛和嘴唇内。
     float finalSkinWeight = skinCandidateWeight * protectedFaceWeight;
 
-    // UV 的 y 向下增大：眼睛中心以下逐渐允许处理。
-    float leftLowerWeight = smoothstep(leftEyeCenter.y, leftEyeCenter.y + leftEyeMaskRadius.y * 0.7, textureCoordinate.y);
-    float rightLowerWeight = smoothstep(rightEyeCenter.y, rightEyeCenter.y + rightEyeMaskRadius.y * 0.7, textureCoordinate.y);
-
-    // 完整眼周椭圆乘以下方限制，只保留下眼区域。
-    float leftUnderEyeWeight = leftEyeWeight * leftLowerWeight;
-    float rightUnderEyeWeight = rightEyeWeight * rightLowerWeight;
-    float underEyeWeight = max(leftUnderEyeWeight, rightUnderEyeWeight);
-
-    // 只在脸框内、符合肤色的下眼区域进行处理。
-    float underEyeCorrectionWeight = underEyeWeight * skinCandidateWeight * faceBoxWeight;
-    // 黑眼圈强度控制下眼区域的提亮幅度。
-    vec3 correctedColor = sourceColor.rgb + vec3(blackCircleStrength) * underEyeCorrectionWeight ;
-
-    gl_FragColor = vec4(correctedColor, sourceColor.a);
+    gl_FragColor = vec4(vec3(finalSkinWeight), sourceColor.a);
 }
+
 // 详细查看 [res/drawable/hue_color_ring.png]
 // 将 RGB 转换为 0--1 范围的 HSV 色相 H。
 float getHue(vec3 color) {
@@ -141,9 +111,9 @@ float getHue(vec3 color) {
     float maxValue = max(max(color.r, color.g), color.b);
     // 取到通道最小值
     float minValue = min(min(color.r, color.g), color.b);
-    // 三通道最大差 同时也是value
+    // 三通道最大差
     float delta = maxValue - minValue;
-    //最大值与最小值几乎相等时属于无彩色,H 没有定义，这里安全返回 0。是灰/白/黑 三色
+    //最大值与最小值几乎相等时属于无彩色，H 没有定义，这里安全返回 0。是灰/白/黑 三色
     if (delta < 0.0001) return 0.0;
     // 如果最大为红 则去计算他是偏向正负 正则为色环右方的黄色 负则为左边的品红 这里的mod单纯用来校正负值 后续不需要因为后续不是从0开始
     if (maxValue == color.r) return mod((color.g - color.b) / delta, 6.0) / 6.0;

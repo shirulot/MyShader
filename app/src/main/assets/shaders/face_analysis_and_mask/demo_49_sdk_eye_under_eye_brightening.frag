@@ -1,7 +1,5 @@
 precision mediump float;
 uniform sampler2D inputImageTexture;
-uniform float whitenStrength;
-
 // 黑眼圈滑条控制下眼区域的提亮幅度。
 uniform float blackCircleStrength;
 varying vec2 textureCoordinate;
@@ -13,16 +11,12 @@ uniform vec2 rightEyeRadius;
 uniform vec2 leftEyeCenter;
 uniform vec2 rightEyeCenter;
 
-//取亮度 RC709
-vec3 lightRec709 = vec3(0.2126, 0.7152, 0.0722);
-
 // 外部分析得到的人脸框中心。
 uniform vec2 faceCenter;
 // 外部分析得到的人脸框宽高。
 uniform vec2 faceSize;
 // 标记当前人脸框数据是否可用。
 uniform float faceCenterReady;
-
 
 // 有效高光带
 float HIGHTLIGHT_START = 0.65;

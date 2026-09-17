@@ -14,6 +14,8 @@
     <string name="shader_demo_whiten_strength_content_description">美白混白值，范围 0.00 到 0.15</string>
     <string name="shader_demo_brighten_strength_label">提亮强度：%1$.2f</string>
     <string name="shader_demo_brighten_strength_content_description">提亮强度，范围 0.00 到 1.00</string>
+    <string name="shader_demo_black_circle_strength_label">黑眼圈：%1$.2f</string>
+    <string name="shader_demo_black_circle_strength_content_description">黑眼圈强度，范围 0.00 到 0.15</string>
     <string name="shader_demo_blur_strength_label">磨皮强度：%1$.2f</string>
     <string name="shader_demo_blur_strength_content_description">磨皮强度，范围 0.00 到 1.00</string>
     <string name="shader_demo_warmth_strength_label">暖色补正：%1$.2f</string>
@@ -33,7 +35,7 @@
     </plurals>
 
     <string name="demo_passthrough_title">原图直通</string>
-    <string name="demo_passthrough_description">当前用于继续 Shader 练习；未参与最终输出的调节 uniform 不显示滑条。</string>
+    <string name="demo_passthrough_description">当前用于继续 Shader 练习；黑眼圈滑条直接控制下眼区域的提亮幅度，范围为 0.00 到 0.15。</string>
     <string name="demo_01_title">Demo 1 · 固定红色</string>
     <string name="demo_01_description">保留原图透明度，将每个片元的 RGB 输出为红色。</string>
     <string name="demo_02_title">Demo 2 · UV 红绿渐变</string>
@@ -115,6 +117,16 @@
     <string name="demo_42_title">Demo 42 · 肤色与区域联合遮罩</string>
     <string name="demo_43_title">Demo 43 · 手工人脸框遮罩</string>
     <string name="demo_44_title">Demo 44 · 像素坐标转 UV 标记</string>
+    <string name="demo_45_title">Demo 45 · 左眼椭圆距离调试</string>
+    <string name="demo_46_title">Demo 46 · 双眼椭圆羽化遮罩</string>
+    <string name="demo_47_title">Demo 47 · 人脸五官保护肤色遮罩</string>
+    <string name="demo_47_description">在人脸框内筛选 HSV 肤色候选，并排除经过羽化的双眼和嘴唇区域，输出最终保护肤色权重。</string>
+    <string name="demo_48_title">Demo 48 · 黑眼圈区域提亮</string>
+    <string name="demo_48_description">在人脸框和肤色候选范围内，按双眼下方的羽化权重局部提亮；黑眼圈强度滑条范围为 0.00 到 0.15。</string>
+    <string name="demo_49_title">Demo 49 · SDK 双眼区域黑眼圈提亮</string>
+    <string name="demo_49_description">使用 SDK 双眼中心与轮廓半径扩张下眼处理区域，在人脸框和肤色候选范围内局部提亮；黑眼圈强度滑条范围为 0.00 到 0.15。</string>
+    <string name="demo_46_description">分别计算左右眼椭圆距离并进行边缘羽化，再取较大权重显示双眼眼周遮罩。</string>
+    <string name="demo_45_description">以手工左眼中心和横纵半径计算归一化椭圆距离，显示中心黑色、向外逐渐变白的灰度图。</string>
     <string name="demo_44_description">将模拟分析点的像素坐标除以设定的图片尺寸，转换为 UV 后在原图上绘制红色标记。</string>
     <string name="demo_43_description">根据手工指定的人脸框中心和宽高计算四条边界，以黑白遮罩显示框内区域，不依赖 SDK 人脸数据。</string>
     <string name="demo_42_description">将 HSV 肤色候选权重与羽化矩形区域权重相乘，以灰度显示同时满足颜色和位置条件的区域。</string>
