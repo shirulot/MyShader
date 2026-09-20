@@ -4,6 +4,10 @@ uniform float whitenStrength;
 
 // 黑眼圈滑条控制下眼区域的提亮幅度。
 uniform float blackCircleStrength;
+// 大眼滑条控制眼睛区域的放大强度，范围由 Android SeekBar 限制为 0.00--0.15，步长为 0.005。
+uniform float bigEyeStrength;
+// 瘦脸滑条控制轮廓向内部收缩的强度，范围为 0.00--0.05，步长为 0.005。
+uniform float slimFaceStrength;
 varying vec2 textureCoordinate;
 
 // SDK 眼部轮廓计算出的原始半径。
@@ -12,6 +16,10 @@ uniform vec2 rightEyeRadius;
 // SDK 检测得到的左右眼中心。
 uniform vec2 leftEyeCenter;
 uniform vec2 rightEyeCenter;
+
+// SDK 轮廓起点及其对应的脸部内部目标点。
+uniform vec2 slimOrigins[9];
+uniform vec2 slimTargets[9];
 
 //取亮度 RC709
 vec3 lightRec709 = vec3(0.2126, 0.7152, 0.0722);
@@ -81,59 +89,58 @@ float getSkinCandidateWeight(vec3 color) {
 
     // 限制肤色色相范围。
     float hueWeight = 1.0 - smoothstep(SKIN_HUE_START, SKIN_HUE_END, hue);
-
     // 排除饱和度过低的灰、白、黑区域。
     float saturationWeight = smoothstep(SKIN_SATURATION_START, SKIN_SATURATION_END, saturation);
-
     // 保护过暗阴影和过亮高光。
     float shadowWeight = smoothstep(SHADOW_START, SHADOW_END, value);
     float highlightWeight = 1.0 - smoothstep(HIGHTLIGHT_START, HIGHTLIGHT_END, value);
 
-
     return hueWeight * saturationWeight * shadowWeight * highlightWeight;
 }
 
-void main() {
-    // 模拟输入准备区：允许读取加光前的原图。
-    vec4 sourceColor = texture2D(inputImageTexture, textureCoordinate);
-    // 原始轮廓只包含眼睛本体，扩张后作为眼周处理范围。
-    vec2 leftEyeMaskRadius = leftEyeRadius * vec2(eyeXRatio, eyeYRatio);
-    vec2 rightEyeMaskRadius = rightEyeRadius * vec2(eyeXRatio,eyeYRatio);
-
-    float lipWeight = getZoneWeight(lipCenter, lipRadius);
-    float leftEyeWeight = getZoneWeight(leftEyeCenter, leftEyeMaskRadius);
-    float rightEyeWeight = getZoneWeight(rightEyeCenter, rightEyeMaskRadius);
-    // 如果在其中一个区域内 则会返回有值
-    float featureWeight = max(max(leftEyeWeight, rightEyeWeight), lipWeight);
-    // 反转五官权重，眼睛和嘴唇变为受保护区域。
-    float featureProtectWeight = 1.0 - featureWeight;
-    // 获取面部区域
-    float faceBoxWeight = getFaceBoxWeight();
-    // 只保留人脸框内部，同时排除眼睛和嘴唇。
-    float protectedFaceWeight = faceBoxWeight * featureProtectWeight;
-
-    // 获取当前片元的肤色候选权重。
-    float skinCandidateWeight = getSkinCandidateWeight(sourceColor.rgb);
-
-    // 同时满足：属于肤色、在人脸框内、不在眼睛和嘴唇内。
-    float finalSkinWeight = skinCandidateWeight * protectedFaceWeight;
-
-    // UV 的 y 向下增大：眼睛中心以下逐渐允许处理。
-    float leftLowerWeight = smoothstep(leftEyeCenter.y, leftEyeCenter.y + leftEyeMaskRadius.y * 0.7, textureCoordinate.y);
-    float rightLowerWeight = smoothstep(rightEyeCenter.y, rightEyeCenter.y + rightEyeMaskRadius.y * 0.7, textureCoordinate.y);
-
-    // 完整眼周椭圆乘以下方限制，只保留下眼区域。
-    float leftUnderEyeWeight = leftEyeWeight * leftLowerWeight;
-    float rightUnderEyeWeight = rightEyeWeight * rightLowerWeight;
-    float underEyeWeight = max(leftUnderEyeWeight, rightUnderEyeWeight);
-
-    // 只在脸框内、符合肤色的下眼区域进行处理。
-    float underEyeCorrectionWeight = underEyeWeight * skinCandidateWeight * faceBoxWeight;
-    // 黑眼圈强度控制下眼区域的提亮幅度。
-    vec3 correctedColor = sourceColor.rgb + vec3(blackCircleStrength) * underEyeCorrectionWeight ;
-
-    gl_FragColor = vec4(correctedColor, sourceColor.a);
+// 获取大眼
+vec2 getBigEyeUv(vec2 uv, vec2 radius, vec2 center){
+    // 使用 SDK 左眼中心和轮廓半径建立椭圆形影响区域。
+    vec2 eyeOffset = uv - center;
+    vec2 effectRadius = max(radius * 2.0, vec2(0.001));
+    float eyeDistance = length(eyeOffset / effectRadius);
+    float eyeWeight = (1.0 - smoothstep(0.0, 1.0, eyeDistance)) * faceCenterReady;
+    // 让采样位置向眼睛中心收缩，使眼睛内容向外放大。
+    float eyeScale = 1.0 - bigEyeStrength * eyeWeight;
+    return center + eyeOffset * eyeScale;
 }
+
+// 根据真实轮廓起点和目标点计算局部瘦脸采样坐标。
+vec2 getSlimFaceUv(vec2 uv, vec2 origin, vec2 target) {
+    vec2 direction = target - origin;
+    // 暂用两点间的 UV 距离作为影响半径，并避免零半径。
+    float radius = max(length(direction), 0.001);
+    float weight = 1.0 - smoothstep(0.0, radius, length(uv - origin));
+    // 沿目标方向的反方向采样，使轮廓内容向目标方向收缩。
+    return uv - direction * slimFaceStrength * weight * faceCenterReady;
+}
+
+// 检查是否溢出UV 溢出 0 不溢出 1
+float insideUv(vec2 value){
+    return step(0.0, value.x) * step(value.x, 1.0) * step(0.0, value.y) * step(value.y, 1.0);
+}
+
+void main() {
+    vec2 leftEyeUv = getBigEyeUv(textureCoordinate, leftEyeRadius, leftEyeCenter);
+    vec2 rightEyeUv = getBigEyeUv(leftEyeUv, rightEyeRadius, rightEyeCenter);
+    // 从双眼处理后的采样坐标开始。
+    vec2 sampledUv = rightEyeUv;
+    // 依次应用全部九组轮廓形变，每组接收上一组的结果。
+    for (int i = 0; i < 8; i++) {
+        sampledUv = getSlimFaceUv(sampledUv, slimOrigins[i], slimTargets[i]);
+    }
+    // 判断形变后的采样坐标是否仍在纹理范围内，包含边界。
+    float inside = insideUv(sampledUv);
+    // 越界时读取原图对应位置，有效时使用形变后的采样坐标。
+    vec2 safeUv = mix(textureCoordinate, sampledUv, inside);
+    gl_FragColor = texture2D(inputImageTexture, safeUv);
+}
+
 // 详细查看 [res/drawable/hue_color_ring.png]
 // 将 RGB 转换为 0--1 范围的 HSV 色相 H。
 float getHue(vec3 color) {
@@ -152,7 +159,7 @@ float getHue(vec3 color) {
     // 如果最大为蓝 则去计算他是偏向正负 正则为色环右方的品红 负则为左边的青色 +4是因为移动到蓝区块
     return ((color.r - color.g) / delta + 4.0) / 6.0;
 }
-
+// 饱和度
 float getSaturation(vec3 color){
     float maxChannel = max(max(color.r, color.g), color.b);
     float minChannel = min(min(color.r, color.g), color.b);

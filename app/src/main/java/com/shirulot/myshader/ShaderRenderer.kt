@@ -55,9 +55,24 @@ class ShaderSurfaceView(
         queueEvent { shaderRenderer.setBrightenStrength(value) }
     }
 
+    fun setSlimFacePairs(pairs: List<FaceWarpPair>) {
+        // 人脸轮廓数据统一切换到 GL 线程保存。
+        queueEvent { shaderRenderer.setSlimFacePairs(pairs) }
+    }
+
     fun setBlackCircleStrength(value: Float) {
         // 黑眼圈 SeekBar 回调来自主线程，uniform 状态必须在 GL 线程更新。
         queueEvent { shaderRenderer.setBlackCircleStrength(value) }
+    }
+
+    fun setBigEyeStrength(value: Float) {
+        // 大眼 SeekBar 回调来自主线程，uniform 状态必须在 GL 线程更新。
+        queueEvent { shaderRenderer.setBigEyeStrength(value) }
+    }
+
+    fun setSlimFaceStrength(value: Float) {
+        // 瘦脸 SeekBar 回调来自主线程，uniform 状态必须在 GL 线程更新。
+        queueEvent { shaderRenderer.setSlimFaceStrength(value) }
     }
 
     fun setWarmthStrength(value: Float) {
@@ -77,7 +92,27 @@ class ShaderSurfaceView(
 
     fun setSourceImage(@DrawableRes sourceImageRes: Int) {
         // 切换图片会创建和删除 OpenGL 纹理，因此同样只能在 GL 线程执行。
-        queueEvent { shaderRenderer.setSourceImage(sourceImageRes) }
+        queueEvent {
+            // 新纹理与清除旧人脸状态在同一个 GL 事件中执行。
+            shaderRenderer.clearFaceAnalysis()
+            shaderRenderer.setSourceImage(sourceImageRes)
+        }
+    }
+
+    /** 同一张图片的检测数据一次性更新，全部就绪后再启用人脸效果。 */
+    fun setFaceAnalysis(
+        face: FaceRegion,
+        eyes: Pair<FaceFeatureRegion, FaceFeatureRegion>,
+        lip: FaceFeatureRegion,
+        slimPairs: List<FaceWarpPair>,
+    ) {
+        queueEvent {
+            shaderRenderer.clearFaceAnalysis()
+            shaderRenderer.setSlimFacePairs(slimPairs)
+            shaderRenderer.setEyeRegions(eyes.first, eyes.second)
+            shaderRenderer.setLipRegions(lip)
+            shaderRenderer.setFaceCenter(face.centerX, face.centerY, face.width, face.height)
+        }
     }
 
     fun setEyeRegions(leftEyeRegion: FaceFeatureRegion, rightEyeRegion: FaceFeatureRegion) {
@@ -102,6 +137,9 @@ private class ShaderRenderer(
     private val fragmentShaderAsset: String,
     private val onStatusChanged: (String) -> Unit,
 ) : GLSurfaceView.Renderer {
+    // 依次保存 9 组瘦脸轮廓起点和内部目标点。
+    private val slimOrigins = FloatArray(SLIM_FACE_PAIR_COUNT * 2)
+    private val slimTargets = FloatArray(SLIM_FACE_PAIR_COUNT * 2)
 
     // 尚未拿到人脸检测结果时，不显示局部脸部区域。
     private var faceCenterReady = false
@@ -144,6 +182,8 @@ private class ShaderRenderer(
     private var whitenStrength = DEFAULT_WHITEN_STRENGTH
     private var brightenStrength = DEFAULT_BRIGHTEN_STRENGTH
     private var blackCircleStrength = DEFAULT_BLACK_CIRCLE_STRENGTH
+    private var bigEyeStrength = DEFAULT_BIG_EYE_STRENGTH
+    private var slimFaceStrength = DEFAULT_SLIM_FACE_STRENGTH
 
     private var warmthStrength = DEFAULT_WARMTH_STRENGTH
     private var saturationStrength = DEFAULT_SATURATION_STRENGTH
@@ -207,6 +247,8 @@ private class ShaderRenderer(
         val whitenStrengthLocation = GLES20.glGetUniformLocation(program, "whitenStrength")
         val brightenStrengthLocation = GLES20.glGetUniformLocation(program, "brightenStrength")
         val blackCircleStrengthLocation = GLES20.glGetUniformLocation(program, "blackCircleStrength")
+        val bigEyeStrengthLocation = GLES20.glGetUniformLocation(program, "bigEyeStrength")
+        val slimFaceStrengthLocation = GLES20.glGetUniformLocation(program, "slimFaceStrength")
         val blurStrengthLocation = GLES20.glGetUniformLocation(program, "blurStrength")
         val warmthStrengthLocation = GLES20.glGetUniformLocation(program, "warmthStrength")
         val saturationStrengthLocation = GLES20.glGetUniformLocation(program, "saturationStrength")
@@ -222,6 +264,10 @@ private class ShaderRenderer(
 
         val lipCenterLocation = GLES20.glGetUniformLocation(program, "lipCenter")
         val lipRadiusLocation = GLES20.glGetUniformLocation(program, "lipRadius")
+
+        //瘦脸-脸轮廓点
+        val slimOriginsLocation = GLES20.glGetUniformLocation(program, "slimOrigins[0]")
+        val slimTargetsLocation = GLES20.glGetUniformLocation(program, "slimTargets[0]")
 
         if (positionLocation < 0 || textureCoordinateLocation < 0 || textureLocation < 0) {
             postStatus(context.getString(R.string.shader_demo_status_interface_error))
@@ -265,6 +311,15 @@ private class ShaderRenderer(
         if (blackCircleStrengthLocation >= 0) {
             GLES20.glUniform1f(blackCircleStrengthLocation, blackCircleStrength)
         }
+        // 只有声明 bigEyeStrength 的 Shader 才接收大眼强度。
+        if (bigEyeStrengthLocation >= 0) {
+            GLES20.glUniform1f(bigEyeStrengthLocation, bigEyeStrength)
+        }
+
+        // 只有声明 slimFaceStrength 的 Shader 才接收瘦脸强度。
+        if (slimFaceStrengthLocation >= 0) {
+            GLES20.glUniform1f(slimFaceStrengthLocation, slimFaceStrength)
+        }
         // 只有磨皮声明 blurStrength；其他 Shader 返回 -1，保持原有行为。
         if (blurStrengthLocation >= 0) {
             GLES20.glUniform1f(blurStrengthLocation, blurStrength)
@@ -295,6 +350,16 @@ private class ShaderRenderer(
         }
         if (faceSizeLocation >= 0) {
             GLES20.glUniform2f(faceSizeLocation, faceWidth, faceHeight)
+        }
+
+        // 每两个 Float 组成一个 vec2，一次上传全部 9 个轮廓起点。
+        if (slimOriginsLocation >= 0) {
+            GLES20.glUniform2fv(slimOriginsLocation, SLIM_FACE_PAIR_COUNT, slimOrigins, 0)
+        }
+
+        // 每两个 Float 组成一个 vec2，一次上传全部 9 个内部目标点。
+        if (slimTargetsLocation >= 0) {
+            GLES20.glUniform2fv(slimTargetsLocation, SLIM_FACE_PAIR_COUNT, slimTargets, 0)
         }
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
         GLES20.glDisableVertexAttribArray(positionLocation)
@@ -338,6 +403,14 @@ private class ShaderRenderer(
 
     fun setBlackCircleStrength(value: Float) {
         blackCircleStrength = value.coerceIn(MIN_BLACK_CIRCLE_STRENGTH, MAX_BLACK_CIRCLE_STRENGTH)
+    }
+
+    fun setBigEyeStrength(value: Float) {
+        bigEyeStrength = value.coerceIn(MIN_BIG_EYE_STRENGTH, MAX_BIG_EYE_STRENGTH)
+    }
+
+    fun setSlimFaceStrength(value: Float) {
+        slimFaceStrength = value.coerceIn(MIN_SLIM_FACE_STRENGTH, MAX_SLIM_FACE_STRENGTH)
     }
 
     fun setWarmthStrength(value: Float) {
@@ -498,10 +571,27 @@ private class ShaderRenderer(
                 position(0)
             }
 
+    fun setSlimFacePairs(pairs: List<FaceWarpPair>) {
+        if (pairs.size != SLIM_FACE_PAIR_COUNT) {
+            faceCenterReady = false
+            return
+        }
+
+        pairs.forEachIndexed { index, pair ->
+            val offset = index * 2
+            slimOrigins[offset] = pair.origin.x
+            slimOrigins[offset + 1] = pair.origin.y
+            slimTargets[offset] = pair.target.x
+            slimTargets[offset + 1] = pair.target.y
+        }
+    }
+
     fun setEyeRegions(leftEyeRegion: FaceFeatureRegion, rightEyeRegion: FaceFeatureRegion) {
         this.leftEyeRegion = leftEyeRegion
         this.rightEyeRegion = rightEyeRegion
     }
+
+
     fun setLipRegions(lipRegion: FaceFeatureRegion) {
         this.lipRegion = lipRegion
     }
@@ -521,6 +611,12 @@ private class ShaderRenderer(
         const val DEFAULT_BLACK_CIRCLE_STRENGTH = 0.12f
         const val MIN_BLACK_CIRCLE_STRENGTH = 0f
         const val MAX_BLACK_CIRCLE_STRENGTH = 0.15f
+        const val DEFAULT_BIG_EYE_STRENGTH = 0.15f
+        const val DEFAULT_SLIM_FACE_STRENGTH = 0.05f
+        const val MIN_BIG_EYE_STRENGTH = 0f
+        const val MIN_SLIM_FACE_STRENGTH = 0f
+        const val MAX_BIG_EYE_STRENGTH = 0.15f
+        const val MAX_SLIM_FACE_STRENGTH = 0.05f
 
         const val DEFAULT_WARMTH_STRENGTH = 0f
         const val MIN_WARMTH_STRENGTH = 0f
@@ -531,5 +627,8 @@ private class ShaderRenderer(
         const val DEFAULT_BLUR_STRENGTH = 0f
         const val MIN_BLUR_STRENGTH = 0f
         const val MAX_BLUR_STRENGTH = 1f
+
+        // 瘦脸 - 脸部轮廓点-下巴点
+        private const val SLIM_FACE_PAIR_COUNT = 9
     }
 }

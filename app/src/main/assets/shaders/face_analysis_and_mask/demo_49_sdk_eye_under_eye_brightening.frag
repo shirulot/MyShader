@@ -126,6 +126,8 @@ void main() {
     // 黑眼圈强度控制下眼区域的提亮幅度。
     vec3 correctedColor = sourceColor.rgb + vec3(blackCircleStrength) * underEyeCorrectionWeight ;
 
+
+
     gl_FragColor = vec4(correctedColor, sourceColor.a);
 }
 // 详细查看 [res/drawable/hue_color_ring.png]

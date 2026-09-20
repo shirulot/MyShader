@@ -12,9 +12,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.annotation.DrawableRes
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.IO
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 独立的 Shader 练习页：只负责把 OpenGL Surface 和少量状态文字放到屏幕上。
@@ -25,6 +29,9 @@ class ShaderDemoActivity : ComponentActivity() {
     private lateinit var statusText: TextView
     private lateinit var controlPanel: LinearLayout
     private lateinit var expandControlsButton: TextView
+    // 用请求编号丢弃旧图片的检测结果，任务随页面销毁取消。
+    private var imageRequestId = 0
+    private var faceDetectionJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,6 +59,15 @@ class ShaderDemoActivity : ComponentActivity() {
             EXTRA_INITIAL_BLACK_CIRCLE_STRENGTH,
             DEFAULT_BLACK_CIRCLE_STRENGTH,
         )
+        val initialBigEyeStrength = intent.getFloatExtra(
+            EXTRA_INITIAL_BIG_EYE_STRENGTH,
+            DEFAULT_BIG_EYE_STRENGTH,
+        )
+
+        val initialSlimFaceStrength = intent.getFloatExtra(
+            EXTRA_INITIAL_SLIM_FACE_STRENGTH,
+            DEFAULT_SLIM_FACE_STRENGTH,
+        )
         val showWhitenStrengthControl = intent.getBooleanExtra(
             EXTRA_SHOW_WHITEN_STRENGTH_CONTROL,
             false,
@@ -62,6 +78,15 @@ class ShaderDemoActivity : ComponentActivity() {
         )
         val showBlackCircleStrengthControl = intent.getBooleanExtra(
             EXTRA_SHOW_BLACK_CIRCLE_STRENGTH_CONTROL,
+            false,
+        )
+        val showBigEyeStrengthControl = intent.getBooleanExtra(
+            EXTRA_SHOW_BIG_EYE_STRENGTH_CONTROL,
+            false,
+        )
+
+        val showSlimFaceStrengthControl = intent.getBooleanExtra(
+            EXTRA_SHOW_SLIM_FACE_STRENGTH_CONTROL,
             false,
         )
         val showBlurStrengthControl = intent.getBooleanExtra(
@@ -89,40 +114,11 @@ class ShaderDemoActivity : ComponentActivity() {
         shaderSurfaceView.setWhitenStrength(initialWhitenStrength)
         shaderSurfaceView.setBrightenStrength(initialBrightenStrength)
         shaderSurfaceView.setBlackCircleStrength(initialBlackCircleStrength)
+        shaderSurfaceView.setBigEyeStrength(initialBigEyeStrength)
+        shaderSurfaceView.setSlimFaceStrength(initialSlimFaceStrength)
         shaderSurfaceView.setBlurStrength(DEFAULT_BLUR_STRENGTH)
         shaderSurfaceView.setSaturationStrength(DEFAULT_SATURATION_STRENGTH)
 
-        GlobalScope.launch(IO) {
-            try {
-                // 初始化人脸关键点；数据无效时关闭所有依赖人脸区域的 Shader 效果。
-                val landmarks = FaceAnalysis.detectLessonFace(resources)
-                if (!FaceAnalysis.hasValidLandmarks(landmarks)) {
-                    shaderSurfaceView.clearFaceAnalysis()
-                    Log.w("FaceAnalysis", "未检测到完整有效的人脸关键点")
-                    return@launch
-                }
-
-                // 从同一份有效关键点中计算人脸、双眼和嘴唇区域。
-                val faceCenterRegion = FaceAnalysis.calculateFaceRegion(landmarks)
-                val (leftEyeRegion, rightEyeRegion) = FaceAnalysis.calculateEyeRegions(landmarks)
-                val lipRegion = FaceAnalysis.calculateLipRegion(landmarks)
-
-                shaderSurfaceView.setFaceCenterRegion(
-                    faceCenterRegion.centerX,
-                    faceCenterRegion.centerY,
-                    faceCenterRegion.width,
-                    faceCenterRegion.height,
-                )
-                shaderSurfaceView.setEyeRegions(leftEyeRegion, rightEyeRegion)
-                shaderSurfaceView.setLipRegions(lipRegion)
-                Log.i("FaceAnalysis", "lipRegion=$lipRegion")
-                Log.i("FaceAnalysis", "leftEye=$leftEyeRegion, rightEye=$rightEyeRegion")
-                Log.i("FaceAnalysis", "pointCount=${landmarks.size / 2}, center=$faceCenterRegion")
-            } catch (error: Exception) {
-                shaderSurfaceView.clearFaceAnalysis()
-                Log.e("FaceAnalysis", "人脸分析失败", error)
-            }
-        }
         val root = FrameLayout(this).apply {
             setBackgroundColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_background))
         }
@@ -171,6 +167,13 @@ class ShaderDemoActivity : ComponentActivity() {
             }
             if (showBlackCircleStrengthControl) {
                 addBlackCircleStrengthControl(this, initialBlackCircleStrength)
+            }
+            if (showBigEyeStrengthControl) {
+                addBigEyeStrengthControl(this, initialBigEyeStrength)
+            }
+
+            if (showSlimFaceStrengthControl) {
+                addSlimFaceStrengthControl(this, initialSlimFaceStrength)
             }
             if (showBlurStrengthControl) {
                 addBlurStrengthControl(this)
@@ -301,6 +304,45 @@ class ShaderDemoActivity : ComponentActivity() {
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
 
+    /** 每次选图重新检测，只有最新请求可以提交整套人脸数据。 */
+    private fun selectSourceImage(@DrawableRes imageRes: Int) {
+        val requestId = ++imageRequestId
+        faceDetectionJob?.cancel()
+        shaderSurfaceView.setSourceImage(imageRes)
+        faceDetectionJob = lifecycleScope.launch {
+            try {
+                // 原生检测可能无法即时取消；返回后仍需检查请求编号。
+                val landmarks = withContext(IO) {
+                    FaceAnalysis.detectLessonFace(resources, imageRes)
+                }
+                if (requestId != imageRequestId) return@launch
+                val imageName = resources.getResourceEntryName(imageRes)
+                if (!FaceAnalysis.hasValidLandmarks(landmarks)) {
+                    Log.w("FaceAnalysis", "image=$imageName, pointCount=${landmarks.size / 2}，非有效单脸数据，保持人脸效果关闭")
+                    return@launch
+                }
+                val face = FaceAnalysis.calculateFaceRegion(landmarks)
+                val eyes = FaceAnalysis.calculateEyeRegions(landmarks)
+                val lip = FaceAnalysis.calculateLipRegion(landmarks)
+                val slimPairs = FaceAnalysis.calculateSlimFacePairs(landmarks)
+                shaderSurfaceView.setFaceAnalysis(face, eyes, lip, slimPairs)
+                Log.i("FaceAnalysis", "image=$imageName, pointCount=${landmarks.size / 2}, center=$face")
+                Log.i("FaceAnalysis", "leftEye=${eyes.first}, rightEye=${eyes.second}, lipRegion=$lip")
+                slimPairs.forEachIndexed { index, pair ->
+                    Log.i("FaceAnalysis", "slimPair[$index]=${pair.origin} -> ${pair.target}")
+                }
+            } catch (cancelled: CancellationException) {
+                // 切图或关闭页面产生的取消不应清除新请求的人脸状态。
+                throw cancelled
+            } catch (error: Exception) {
+                if (requestId == imageRequestId) {
+                    shaderSurfaceView.clearFaceAnalysis()
+                    Log.e("FaceAnalysis", "当前图片人脸分析失败", error)
+                }
+            }
+        }
+    }
+
     private fun addSourceImageControl(panel: LinearLayout) {
         val sourceImageText = TextView(this).apply {
             setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
@@ -309,18 +351,21 @@ class ShaderDemoActivity : ComponentActivity() {
         }
         val originalImageButton = sourceImageRadioButton(R.string.shader_demo_source_image_original)
         val detailImageButton = sourceImageRadioButton(R.string.shader_demo_source_image_detail)
+        val twoFacesButton = sourceImageRadioButton(R.string.shader_demo_source_image_two_faces)
         val sourceImageGroup = RadioGroup(this).apply {
             orientation = RadioGroup.HORIZONTAL
             addView(originalImageButton)
             addView(detailImageButton)
+            addView(twoFacesButton)
             setOnCheckedChangeListener { _, checkedId ->
                 val selectedImageRes = when (checkedId) {
                     originalImageButton.id -> R.drawable.lesson_face
                     detailImageButton.id -> R.drawable.lesson_face_detail
+                    twoFacesButton.id -> R.drawable.lesson_two_faces
                     else -> return@setOnCheckedChangeListener
                 }
-                // 两张图片对所有 Demo 共用同一纹理入口，Shader 本身无需修改。
-                shaderSurfaceView.setSourceImage(selectedImageRes)
+                // 所有图片统一走纹理切换和重新检测入口。
+                selectSourceImage(selectedImageRes)
             }
         }
         // 原练习图保持默认选中，新图片可在任意 Demo 中随时切换。
@@ -444,6 +489,87 @@ class ShaderDemoActivity : ComponentActivity() {
                     strengthText.text = getString(R.string.shader_demo_black_circle_strength_label, value)
                     // 将黑眼圈提亮系数上传给当前 Shader。
                     shaderSurfaceView.setBlackCircleStrength(value)
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
+
+                override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
+            })
+        }
+        panel.addView(
+            strengthText,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(8) },
+        )
+        panel.addView(
+            strengthSeekBar,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+    }
+
+    /** 将大眼强度按 0.005 步长映射为 0.00 到 0.15，并上传给 Shader uniform。 */
+    private fun addBigEyeStrengthControl(panel: LinearLayout, initialValue: Float) {
+        val strengthText = TextView(this).apply {
+            setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
+            textSize = 13f
+            text = getString(R.string.shader_demo_big_eye_strength_label, initialValue)
+        }
+        val strengthSeekBar = SeekBar(this).apply {
+            max = BIG_EYE_STRENGTH_PROGRESS_MAX
+            progress = bigEyeStrengthToProgress(initialValue)
+            contentDescription = getString(R.string.shader_demo_big_eye_strength_content_description)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                    val value = bigEyeStrengthFromProgress(progress)
+                    strengthText.text = getString(R.string.shader_demo_big_eye_strength_label, value)
+                    // 将大眼强度上传给当前 Shader。
+                    shaderSurfaceView.setBigEyeStrength(value)
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
+
+                override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
+            })
+        }
+        panel.addView(
+            strengthText,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(8) },
+        )
+        panel.addView(
+            strengthSeekBar,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+    }
+
+
+    /** 将瘦脸强度按 0.005 步长映射为 0.00 到 0.05，并上传给 Shader uniform。 */
+    private fun addSlimFaceStrengthControl(panel: LinearLayout, initialValue: Float) {
+        val strengthText = TextView(this).apply {
+            setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
+            textSize = 13f
+            text = getString(R.string.shader_demo_slim_face_strength_label, initialValue)
+        }
+        val strengthSeekBar = SeekBar(this).apply {
+            max = SLIM_FACE_STRENGTH_PROGRESS_MAX
+            progress = slimFaceStrengthToProgress(initialValue)
+            contentDescription = getString(R.string.shader_demo_slim_face_strength_content_description)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                    val value = slimFaceStrengthFromProgress(progress)
+                    strengthText.text = getString(R.string.shader_demo_slim_face_strength_label, value)
+                    // 将瘦脸强度上传给当前 Shader。
+                    shaderSurfaceView.setSlimFaceStrength(value)
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
@@ -621,15 +747,35 @@ class ShaderDemoActivity : ComponentActivity() {
         (BLACK_CIRCLE_STRENGTH_MIN + progress * BLACK_CIRCLE_STRENGTH_STEP)
             .coerceAtMost(BLACK_CIRCLE_STRENGTH_MAX)
 
+    private fun bigEyeStrengthToProgress(value: Float): Int =
+        ((value.coerceIn(BIG_EYE_STRENGTH_MIN, BIG_EYE_STRENGTH_MAX) - BIG_EYE_STRENGTH_MIN) /
+                BIG_EYE_STRENGTH_STEP).toInt()
+
+    private fun bigEyeStrengthFromProgress(progress: Int): Float =
+        (BIG_EYE_STRENGTH_MIN + progress * BIG_EYE_STRENGTH_STEP)
+            .coerceAtMost(BIG_EYE_STRENGTH_MAX)
+
+    private fun slimFaceStrengthToProgress(value: Float): Int =
+        ((value.coerceIn(SLIM_FACE_STRENGTH_MIN, SLIM_FACE_STRENGTH_MAX) - SLIM_FACE_STRENGTH_MIN) /
+                SLIM_FACE_STRENGTH_STEP).toInt()
+
+    private fun slimFaceStrengthFromProgress(progress: Int): Float =
+        (SLIM_FACE_STRENGTH_MIN + progress * SLIM_FACE_STRENGTH_STEP)
+            .coerceAtMost(SLIM_FACE_STRENGTH_MAX)
+
     companion object {
         private const val EXTRA_FRAGMENT_SHADER_ASSET = "fragment_shader_asset"
         private const val EXTRA_DEMO_TITLE = "demo_title"
         private const val EXTRA_INITIAL_WHITEN_STRENGTH = "initial_whiten_strength"
         private const val EXTRA_INITIAL_BRIGHTEN_STRENGTH = "initial_brighten_strength"
         private const val EXTRA_INITIAL_BLACK_CIRCLE_STRENGTH = "initial_black_circle_strength"
+        private const val EXTRA_INITIAL_BIG_EYE_STRENGTH = "initial_big_eye_strength"
+        private const val EXTRA_INITIAL_SLIM_FACE_STRENGTH = "initial_slim_face_strength"
         private const val EXTRA_SHOW_WHITEN_STRENGTH_CONTROL = "show_whiten_strength_control"
         private const val EXTRA_SHOW_BRIGHTEN_STRENGTH_CONTROL = "show_brighten_strength_control"
         private const val EXTRA_SHOW_BLACK_CIRCLE_STRENGTH_CONTROL = "show_black_circle_strength_control"
+        private const val EXTRA_SHOW_BIG_EYE_STRENGTH_CONTROL = "show_big_eye_strength_control"
+        private const val EXTRA_SHOW_SLIM_FACE_STRENGTH_CONTROL = "show_slim_face_strength_control"
         private const val EXTRA_SHOW_BLUR_STRENGTH_CONTROL = "show_blur_strength_control"
         private const val EXTRA_SHOW_WARMTH_STRENGTH_CONTROL = "show_warmth_strength_control"
         private const val EXTRA_SHOW_SATURATION_STRENGTH_CONTROL = "show_saturation_strength_control"
@@ -649,6 +795,16 @@ class ShaderDemoActivity : ComponentActivity() {
         private const val BLACK_CIRCLE_STRENGTH_STEP = 0.01f
         private const val BLACK_CIRCLE_STRENGTH_PROGRESS_MAX = 15
         private const val DEFAULT_BLACK_CIRCLE_STRENGTH = 0.12f
+        private const val BIG_EYE_STRENGTH_MIN = 0f
+        private const val SLIM_FACE_STRENGTH_MIN = 0f
+        private const val BIG_EYE_STRENGTH_MAX = 0.15f
+        private const val SLIM_FACE_STRENGTH_MAX = 0.05f
+        private const val BIG_EYE_STRENGTH_STEP = 0.005f
+        private const val SLIM_FACE_STRENGTH_STEP = 0.005f
+        private const val BIG_EYE_STRENGTH_PROGRESS_MAX = 30
+        private const val SLIM_FACE_STRENGTH_PROGRESS_MAX = 10
+        private const val DEFAULT_BIG_EYE_STRENGTH = 0.15f
+        private const val DEFAULT_SLIM_FACE_STRENGTH = 0.05f
         private const val BLUR_STRENGTH_MIN = 0f
         private const val BLUR_STRENGTH_MAX = 1f
         private const val BLUR_STRENGTH_STEP = 0.01f
@@ -678,9 +834,13 @@ class ShaderDemoActivity : ComponentActivity() {
             initialWhitenStrength: Float,
             initialBrightenStrength: Float,
             initialBlackCircleStrength: Float,
+            initialBigEyeStrength: Float,
+            initialSlimFaceStrength: Float,
             showWhitenStrengthControl: Boolean,
             showBrightenStrengthControl: Boolean,
             showBlackCircleStrengthControl: Boolean,
+            showBigEyeStrengthControl: Boolean,
+            showSlimFaceStrengthControl: Boolean,
             showBlurStrengthControl: Boolean,
             showWarmthStrengthControl: Boolean,
             showSaturationStrengthControl: Boolean,
@@ -690,9 +850,13 @@ class ShaderDemoActivity : ComponentActivity() {
             putExtra(EXTRA_INITIAL_WHITEN_STRENGTH, initialWhitenStrength)
             putExtra(EXTRA_INITIAL_BRIGHTEN_STRENGTH, initialBrightenStrength)
             putExtra(EXTRA_INITIAL_BLACK_CIRCLE_STRENGTH, initialBlackCircleStrength)
+            putExtra(EXTRA_INITIAL_BIG_EYE_STRENGTH, initialBigEyeStrength)
+            putExtra(EXTRA_INITIAL_SLIM_FACE_STRENGTH, initialSlimFaceStrength)
             putExtra(EXTRA_SHOW_WHITEN_STRENGTH_CONTROL, showWhitenStrengthControl)
             putExtra(EXTRA_SHOW_BRIGHTEN_STRENGTH_CONTROL, showBrightenStrengthControl)
             putExtra(EXTRA_SHOW_BLACK_CIRCLE_STRENGTH_CONTROL, showBlackCircleStrengthControl)
+            putExtra(EXTRA_SHOW_BIG_EYE_STRENGTH_CONTROL, showBigEyeStrengthControl)
+            putExtra(EXTRA_SHOW_SLIM_FACE_STRENGTH_CONTROL, showSlimFaceStrengthControl)
             putExtra(EXTRA_SHOW_BLUR_STRENGTH_CONTROL, showBlurStrengthControl)
             putExtra(EXTRA_SHOW_WARMTH_STRENGTH_CONTROL, showWarmthStrengthControl)
             putExtra(EXTRA_SHOW_SATURATION_STRENGTH_CONTROL, showSaturationStrengthControl)

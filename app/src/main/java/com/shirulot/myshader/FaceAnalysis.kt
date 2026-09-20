@@ -2,6 +2,7 @@ package com.shirulot.myshader
 
 import android.content.res.Resources
 import android.graphics.BitmapFactory
+import androidx.annotation.DrawableRes
 import com.pixpark.gpupixel.FaceDetector
 import com.pixpark.gpupixel.GPUPixelSourceImage
 import kotlin.math.abs
@@ -9,6 +10,27 @@ import kotlin.math.abs
 
 object FaceAnalysis {
 
+    // GPUPixel 瘦脸算法使用的轮廓起点与内部目标点索引。
+    private val SLIM_FACE_INDEX_PAIRS = arrayOf(
+        // 左外侧
+        3 to 44,
+        // 右外侧
+        29 to 44,
+        // 左中侧
+        7 to 45,
+        // 右中侧
+        25 to 45,
+        // 左内侧
+        10 to 46,
+        // 右内侧
+        22 to 46,
+        // 左下颌
+        14 to 49,
+        // 右下颌
+        18 to 49,
+        // 下巴
+        16 to 49,
+    )
     // 左眼中心
     private const val LEFT_EYE_CENTER_INDEX = 74
 
@@ -102,11 +124,13 @@ object FaceAnalysis {
         )
     }
 
-    fun detectLessonFace(resources: Resources): FloatArray {
+    /** 检测当前选中的测试图片；串行调用原生检测器，避免快速切图时并发访问 SDK。 */
+    @Synchronized
+    fun detectLessonFace(resources: Resources, @DrawableRes imageRes: Int = R.drawable.lesson_face): FloatArray {
         val bitmap = requireNotNull(
             BitmapFactory.decodeResource(
                 resources,
-                R.drawable.lesson_face,
+                imageRes,
                 BitmapFactory.Options().apply { inScaled = false },
             ),
         )
@@ -135,8 +159,21 @@ object FaceAnalysis {
     private const val REQUIRED_LANDMARK_COUNT = 111
 
     fun hasValidLandmarks(landmarks: FloatArray): Boolean {
-        return landmarks.size >= REQUIRED_LANDMARK_COUNT * 2 &&
+        // 当前渲染链只接收完整的一张脸，拒绝多脸拼接数据，避免脸框和五官串用。
+        return landmarks.size == REQUIRED_LANDMARK_COUNT * 2 &&
                 landmarks.size % 2 == 0 &&
                 landmarks.all { it.isFinite() && it in 0f..1f }
+    }
+
+    /** 从 SDK 关键点中读取全部瘦脸形变点对。 */
+    fun calculateSlimFacePairs(landmarks: FloatArray): List<FaceWarpPair> {
+        require(hasValidLandmarks(landmarks)) { "瘦脸关键点数据无效" }
+
+        return SLIM_FACE_INDEX_PAIRS.map { (originIndex, targetIndex) ->
+            FaceWarpPair(
+                origin = getPoint(landmarks, originIndex),
+                target = getPoint(landmarks, targetIndex),
+            )
+        }
     }
 }

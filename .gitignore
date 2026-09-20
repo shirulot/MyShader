@@ -13,3 +13,5 @@
 .externalNativeBuild
 .cxx
 local.properties
+# Kotlin 编译失败诊断日志属于本地构建产物。
+/.kotlin/errors/

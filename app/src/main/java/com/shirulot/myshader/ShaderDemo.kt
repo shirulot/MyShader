@@ -13,11 +13,17 @@ data class ShaderDemo(
     val initialBrightenStrength: Float = 0f,
     // 主练习的黑眼圈提亮系数默认从 0.12 开始。
     val initialBlackCircleStrength: Float = 0.12f,
+    // 主练习的大眼强度默认保持新的上限 0.15。
+    val initialBigEyeStrength: Float = 0.15f,
+    // 瘦脸初值默认保持新的上限 0.05。
+    val initialSlimFaceStrength: Float = 0.05f,
     // 滑条展示按 Demo 的实际最终输出决定；归档入口 Demo 时需同步对应控制配置。
     // 渲染器仍会安全忽略未声明的 uniform。
     val showWhitenStrengthControl: Boolean = false,
     val showBrightenStrengthControl: Boolean = false,
     val showBlackCircleStrengthControl: Boolean = false,
+    val showBigEyeStrengthControl: Boolean = false,
+    val showSlimFaceStrengthControl: Boolean = false,
     val showBlurStrengthControl: Boolean = false,
     // 暖色补正滑条控制 Shader 的 warmthStrength uniform。
     val showWarmthStrengthControl: Boolean = false,
@@ -35,13 +41,14 @@ data class ShaderDemoGroup(
 /** 集中维护 Demo 顺序，避免首页和渲染页各自保存一份映射。 */
 object ShaderDemoCatalog {
     val standaloneItems: List<ShaderDemo> = listOf(
-        // 当前 main.frag 的黑眼圈 uniform 参与下眼区域提亮计算，因此展示对应滑条。
+        // 当前 main.frag 使用 bigEyeStrength 控制双眼区域的 UV 放大，因此展示大眼滑条。
         ShaderDemo(
             R.string.demo_passthrough_title,
             R.string.demo_passthrough_description,
             "main.frag",
-            initialBlackCircleStrength = 0.12f,
-            showBlackCircleStrengthControl = true,
+            showSlimFaceStrengthControl = true,
+            initialBigEyeStrength = 0.15f,
+            showBigEyeStrengthControl = true,
         ),
     )
 
@@ -82,19 +89,14 @@ object ShaderDemoCatalog {
             initiallyExpanded = false,
         ),
         ShaderDemoGroup(
-            titleRes = R.string.demo_group_local_color_difference_debug,
+            titleRes = R.string.demo_group_skin_tone_equalization,
             demos = listOf(
                 // 此 Demo 最终输出局部色差灰度图，resultRgb 未参与输出，因此不展示滑条。
                 ShaderDemo(R.string.demo_18_title, R.string.demo_18_description, "shaders/local_color_difference_debug/demo_18_edge_difference_debug.frag"),
                 ShaderDemo(R.string.demo_19_title, R.string.demo_19_description, "shaders/local_color_difference_debug/demo_19_warm_skin_smoothing.frag", showBlurStrengthControl = true),
                 ShaderDemo(R.string.demo_20_title, R.string.demo_20_description, "shaders/local_color_difference_debug/demo_20_local_warm_tone_debug.frag", showBlurStrengthControl = true),
                 ShaderDemo(R.string.demo_21_title, R.string.demo_21_description, "shaders/local_color_difference_debug/demo_21_warmth_strength_uniform.frag", showBlurStrengthControl = true, showWarmthStrengthControl = true),
-            ),
-            initiallyExpanded = false,
-        ),
-        ShaderDemoGroup(
-            titleRes = R.string.demo_group_brightness_and_chroma,
-            demos = listOf(
+                // 第四章继续覆盖亮度与色度调试及局部调色。
                 ShaderDemo(R.string.demo_22_title, R.string.demo_22_description, "shaders/brightness_and_chroma/demo_22_luminance_chroma_debug.frag", showBlurStrengthControl = true, showWarmthStrengthControl = true),
                 ShaderDemo(R.string.demo_23_title, R.string.demo_23_description, "shaders/brightness_and_chroma/demo_23_luminance_range_warmth.frag", showBlurStrengthControl = true, showWarmthStrengthControl = true),
                 ShaderDemo(R.string.demo_24_title, R.string.demo_24_description, "shaders/brightness_and_chroma/demo_24_midtone_weight_debug.frag", showBlurStrengthControl = true, showWarmthStrengthControl = true),
@@ -108,7 +110,7 @@ object ShaderDemoCatalog {
             ),
             initiallyExpanded = false,
         ),
-        // 图像输入练习放在人脸分析与区域遮罩之前，保持输入坐标到区域处理的学习顺序。
+        // 第五章图像输入练习放在人脸分析与区域遮罩之前，保持输入坐标到区域处理的学习顺序。
         ShaderDemoGroup(
             titleRes = R.string.demo_group_image_input_and_color_management,
             demos = listOf(
@@ -131,7 +133,7 @@ object ShaderDemoCatalog {
             ),
             initiallyExpanded = false,
         ),
-        // 第五章的人脸分析与区域遮罩 Demo 统一放在独立分组中。
+        // 第六章的人脸分析与区域遮罩 Demo 统一放在独立分组中。
         ShaderDemoGroup(
             titleRes = R.string.demo_group_face_analysis_and_mask,
             demos = listOf(
@@ -170,6 +172,49 @@ object ShaderDemoCatalog {
                     "shaders/face_analysis_and_mask/demo_49_sdk_eye_under_eye_brightening.frag",
                     initialBlackCircleStrength = 0.12f,
                     showBlackCircleStrengthControl = true,
+                ),
+            ),
+            initiallyExpanded = false,
+        ),
+        // 第七章从固定中心、半径和偏移量开始练习局部 UV 形变。
+        ShaderDemoGroup(
+            titleRes = R.string.demo_group_face_shaping,
+            demos = listOf(
+                // Demo 50 使用固定 UV 偏移，没有调节 uniform，因此不显示滑条。
+                ShaderDemo(
+                    R.string.demo_50_title,
+                    R.string.demo_50_description,
+                    "shaders/face_shaping/demo_50_local_uv_shift.frag",
+                ),
+                // Demo 51 在固定中心和半径基础上，给 UV 偏移增加平滑衰减。
+                ShaderDemo(
+                    R.string.demo_51_title,
+                    R.string.demo_51_description,
+                    "shaders/face_shaping/demo_51_local_uv_shift_falloff.frag",
+                ),
+                // Demo 52 使用固定左脸颊中心、半径和偏移量，不需要调节滑条。
+                ShaderDemo(
+                    R.string.demo_52_title,
+                    R.string.demo_52_description,
+                    "shaders/face_shaping/demo_52_local_cheek_uv_shift.frag",
+                ),
+                // Demo 53 归档当前双眼大眼版本，最终输出使用 bigEyeStrength，因此保留大眼滑条。
+                ShaderDemo(
+                    R.string.demo_53_title,
+                    R.string.demo_53_description,
+                    "shaders/face_shaping/demo_53_sdk_both_eye_uv_scale.frag",
+                    initialBigEyeStrength = 0.15f,
+                    showBigEyeStrengthControl = true,
+                ),
+                // Demo 54 归档当前 main.frag 的双眼放大与轮廓瘦脸版本，因此保留两个实际参与输出的滑条。
+                ShaderDemo(
+                    R.string.demo_54_title,
+                    R.string.demo_54_description,
+                    "shaders/face_shaping/demo_54_sdk_eye_and_slim_face_uv_warp.frag",
+                    initialBigEyeStrength = 0.15f,
+                    showBigEyeStrengthControl = true,
+                    initialSlimFaceStrength = 0.05f,
+                    showSlimFaceStrengthControl = true,
                 ),
             ),
             initiallyExpanded = false,
