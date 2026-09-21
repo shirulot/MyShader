@@ -8,6 +8,8 @@ uniform float blackCircleStrength;
 uniform float bigEyeStrength;
 // 瘦脸滑条控制轮廓向内部收缩的强度，范围为 0.00--0.05，步长为 0.005。
 uniform float slimFaceStrength;
+// 口红滑条控制目标色混入原图的强度，范围由 Android 端限制为 0.00--1.00。
+uniform float lipstickStrength;
 varying vec2 textureCoordinate;
 
 // SDK 眼部轮廓计算出的原始半径。
@@ -105,8 +107,9 @@ vec2 getBigEyeUv(vec2 uv, vec2 radius, vec2 center){
     vec2 effectRadius = max(radius * 2.0, vec2(0.001));
     float eyeDistance = length(eyeOffset / effectRadius);
     float eyeWeight = (1.0 - smoothstep(0.0, 1.0, eyeDistance)) * faceCenterReady;
+    float safeBigEyeStrength = clamp(bigEyeStrength, 0.0, 0.15);
     // 让采样位置向眼睛中心收缩，使眼睛内容向外放大。
-    float eyeScale = 1.0 - bigEyeStrength * eyeWeight;
+    float eyeScale = 1.0 - safeBigEyeStrength * eyeWeight;
     return center + eyeOffset * eyeScale;
 }
 
@@ -116,8 +119,9 @@ vec2 getSlimFaceUv(vec2 uv, vec2 origin, vec2 target) {
     // 暂用两点间的 UV 距离作为影响半径，并避免零半径。
     float radius = max(length(direction), 0.001);
     float weight = 1.0 - smoothstep(0.0, radius, length(uv - origin));
+    float safeSlimFaceStrength = clamp(slimFaceStrength, 0.0, 0.05);
     // 沿目标方向的反方向采样，使轮廓内容向目标方向收缩。
-    return uv - direction * slimFaceStrength * weight * faceCenterReady;
+    return uv - direction * safeSlimFaceStrength * weight * faceCenterReady;
 }
 
 // 检查是否溢出UV 溢出 0 不溢出 1
@@ -126,21 +130,23 @@ float insideUv(vec2 value){
 }
 
 void main() {
-    vec2 leftEyeUv = getBigEyeUv(textureCoordinate, leftEyeRadius, leftEyeCenter);
-    vec2 rightEyeUv = getBigEyeUv(leftEyeUv, rightEyeRadius, rightEyeCenter);
-    // 从双眼处理后的采样坐标开始。
-    vec2 sampledUv = rightEyeUv;
-    // 依次应用全部九组轮廓形变，每组接收上一组的结果。
-    for (int i = 0; i < 8; i++) {
-        sampledUv = getSlimFaceUv(sampledUv, slimOrigins[i], slimTargets[i]);
-    }
-    // 判断形变后的采样坐标是否仍在纹理范围内，包含边界。
-    float inside = insideUv(sampledUv);
-    // 越界时读取原图对应位置，有效时使用形变后的采样坐标。
-    vec2 safeUv = mix(textureCoordinate, sampledUv, inside);
-    gl_FragColor = texture2D(inputImageTexture, safeUv);
+    // 读取原图 alpha，保持 inputImageTexture 处于实际使用状态。
+    vec4 sourceColor = texture2D(inputImageTexture, textureCoordinate);
+    // 用嘴唇横纵半径归一化偏移量，并避免除以零。
+    vec2 lipOffset = (textureCoordinate - lipCenter) / max(lipRadius, vec2(0.001));
+    // 中心距离为零，椭圆边界距离为一。
+    float lipDistance = length(lipOffset);
+    // 缩窄边缘羽化范围，让目标色覆盖更多嘴唇区域。
+    float lipWeight = (1.0 - smoothstep(0.90, 1.0, lipDistance)) * faceCenterReady;
+    // 选择一个固定的口红目标色。
+    vec3 lipstickColor = vec3(0.78, 0.06, 0.16);
+    // 再次限制外部参数，避免异常值让颜色混合超出预期。
+    float safeLipstickStrength = clamp(lipstickStrength, 0.0, 1.0);
+    // 按嘴唇权重把原图与目标色混合。
+    vec3 resultColor = mix(sourceColor.rgb, lipstickColor, lipWeight * safeLipstickStrength);
+    // 输出混合结果，保留原图透明度。
+    gl_FragColor = vec4(resultColor, sourceColor.a);
 }
-
 // 详细查看 [res/drawable/hue_color_ring.png]
 // 将 RGB 转换为 0--1 范围的 HSV 色相 H。
 float getHue(vec3 color) {

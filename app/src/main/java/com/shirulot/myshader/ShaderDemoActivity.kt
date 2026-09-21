@@ -68,6 +68,10 @@ class ShaderDemoActivity : ComponentActivity() {
             EXTRA_INITIAL_SLIM_FACE_STRENGTH,
             DEFAULT_SLIM_FACE_STRENGTH,
         )
+        val initialLipstickStrength = intent.getFloatExtra(
+            EXTRA_INITIAL_LIPSTICK_STRENGTH,
+            DEFAULT_LIPSTICK_STRENGTH,
+        )
         val showWhitenStrengthControl = intent.getBooleanExtra(
             EXTRA_SHOW_WHITEN_STRENGTH_CONTROL,
             false,
@@ -87,6 +91,10 @@ class ShaderDemoActivity : ComponentActivity() {
 
         val showSlimFaceStrengthControl = intent.getBooleanExtra(
             EXTRA_SHOW_SLIM_FACE_STRENGTH_CONTROL,
+            false,
+        )
+        val showLipstickStrengthControl = intent.getBooleanExtra(
+            EXTRA_SHOW_LIPSTICK_STRENGTH_CONTROL,
             false,
         )
         val showBlurStrengthControl = intent.getBooleanExtra(
@@ -116,6 +124,7 @@ class ShaderDemoActivity : ComponentActivity() {
         shaderSurfaceView.setBlackCircleStrength(initialBlackCircleStrength)
         shaderSurfaceView.setBigEyeStrength(initialBigEyeStrength)
         shaderSurfaceView.setSlimFaceStrength(initialSlimFaceStrength)
+        shaderSurfaceView.setLipstickStrength(initialLipstickStrength)
         shaderSurfaceView.setBlurStrength(DEFAULT_BLUR_STRENGTH)
         shaderSurfaceView.setSaturationStrength(DEFAULT_SATURATION_STRENGTH)
 
@@ -159,6 +168,13 @@ class ShaderDemoActivity : ComponentActivity() {
             })
             addView(statusText)
             addSourceImageControl(this)
+            // 第三方许可随 App 提供，可在离线状态阅读。
+            addView(TextView(this@ShaderDemoActivity).apply {
+                setText(R.string.open_source_licenses)
+                setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
+                setPadding(0, dp(8), 0, dp(8))
+                setOnClickListener { OpenSourceLicenses.show(this@ShaderDemoActivity) }
+            })
             if (showWhitenStrengthControl) {
                 addWhitenStrengthControl(this, initialWhitenStrength)
             }
@@ -174,6 +190,9 @@ class ShaderDemoActivity : ComponentActivity() {
 
             if (showSlimFaceStrengthControl) {
                 addSlimFaceStrengthControl(this, initialSlimFaceStrength)
+            }
+            if (showLipstickStrengthControl) {
+                addLipstickStrengthControl(this, initialLipstickStrength)
             }
             if (showBlurStrengthControl) {
                 addBlurStrengthControl(this)
@@ -312,13 +331,15 @@ class ShaderDemoActivity : ComponentActivity() {
         faceDetectionJob = lifecycleScope.launch {
             try {
                 // 原生检测可能无法即时取消；返回后仍需检查请求编号。
-                val landmarks = withContext(IO) {
-                    FaceAnalysis.detectLessonFace(resources, imageRes)
+                val faces = withContext(IO) {
+                    MediaPipeFaceDetector.detect(applicationContext, imageRes)
                 }
                 if (requestId != imageRequestId) return@launch
                 val imageName = resources.getResourceEntryName(imageRes)
-                if (!FaceAnalysis.hasValidLandmarks(landmarks)) {
-                    Log.w("FaceAnalysis", "image=$imageName, pointCount=${landmarks.size / 2}，非有效单脸数据，保持人脸效果关闭")
+                val landmarks = FaceAnalysis.singleFaceOrNull(faces)
+                Log.i("FaceAnalysis", "detector=MediaPipe, image=$imageName, faceCount=${faces.size}, pointCounts=${faces.map { it.size / 2 }}")
+                if (landmarks == null) {
+                    Log.w("FaceAnalysis", "image=$imageName，非有效单脸数据，保持人脸效果关闭")
                     return@launch
                 }
                 val face = FaceAnalysis.calculateFaceRegion(landmarks)
@@ -593,6 +614,46 @@ class ShaderDemoActivity : ComponentActivity() {
         )
     }
 
+    /** 将口红强度按 0.01 步长映射为 0.00 到 1.00，并上传给 Shader uniform。 */
+    private fun addLipstickStrengthControl(panel: LinearLayout, initialValue: Float) {
+        val strengthText = TextView(this).apply {
+            setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
+            textSize = 13f
+            text = getString(R.string.shader_demo_lipstick_strength_label, initialValue)
+        }
+        val strengthSeekBar = SeekBar(this).apply {
+            max = LIPSTICK_STRENGTH_PROGRESS_MAX
+            progress = lipstickStrengthToProgress(initialValue)
+            contentDescription = getString(R.string.shader_demo_lipstick_strength_content_description)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                    val value = lipstickStrengthFromProgress(progress)
+                    strengthText.text = getString(R.string.shader_demo_lipstick_strength_label, value)
+                    // 将口红强度上传给当前 Shader。
+                    shaderSurfaceView.setLipstickStrength(value)
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
+
+                override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
+            })
+        }
+        panel.addView(
+            strengthText,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(8) },
+        )
+        panel.addView(
+            strengthSeekBar,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+    }
+
     private fun addBlurStrengthControl(panel: LinearLayout) {
         val strengthText = TextView(this).apply {
             setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
@@ -763,6 +824,14 @@ class ShaderDemoActivity : ComponentActivity() {
         (SLIM_FACE_STRENGTH_MIN + progress * SLIM_FACE_STRENGTH_STEP)
             .coerceAtMost(SLIM_FACE_STRENGTH_MAX)
 
+    private fun lipstickStrengthToProgress(value: Float): Int =
+        ((value.coerceIn(LIPSTICK_STRENGTH_MIN, LIPSTICK_STRENGTH_MAX) - LIPSTICK_STRENGTH_MIN) /
+                LIPSTICK_STRENGTH_STEP).toInt()
+
+    private fun lipstickStrengthFromProgress(progress: Int): Float =
+        (LIPSTICK_STRENGTH_MIN + progress * LIPSTICK_STRENGTH_STEP)
+            .coerceAtMost(LIPSTICK_STRENGTH_MAX)
+
     companion object {
         private const val EXTRA_FRAGMENT_SHADER_ASSET = "fragment_shader_asset"
         private const val EXTRA_DEMO_TITLE = "demo_title"
@@ -771,11 +840,13 @@ class ShaderDemoActivity : ComponentActivity() {
         private const val EXTRA_INITIAL_BLACK_CIRCLE_STRENGTH = "initial_black_circle_strength"
         private const val EXTRA_INITIAL_BIG_EYE_STRENGTH = "initial_big_eye_strength"
         private const val EXTRA_INITIAL_SLIM_FACE_STRENGTH = "initial_slim_face_strength"
+        private const val EXTRA_INITIAL_LIPSTICK_STRENGTH = "initial_lipstick_strength"
         private const val EXTRA_SHOW_WHITEN_STRENGTH_CONTROL = "show_whiten_strength_control"
         private const val EXTRA_SHOW_BRIGHTEN_STRENGTH_CONTROL = "show_brighten_strength_control"
         private const val EXTRA_SHOW_BLACK_CIRCLE_STRENGTH_CONTROL = "show_black_circle_strength_control"
         private const val EXTRA_SHOW_BIG_EYE_STRENGTH_CONTROL = "show_big_eye_strength_control"
         private const val EXTRA_SHOW_SLIM_FACE_STRENGTH_CONTROL = "show_slim_face_strength_control"
+        private const val EXTRA_SHOW_LIPSTICK_STRENGTH_CONTROL = "show_lipstick_strength_control"
         private const val EXTRA_SHOW_BLUR_STRENGTH_CONTROL = "show_blur_strength_control"
         private const val EXTRA_SHOW_WARMTH_STRENGTH_CONTROL = "show_warmth_strength_control"
         private const val EXTRA_SHOW_SATURATION_STRENGTH_CONTROL = "show_saturation_strength_control"
@@ -805,6 +876,11 @@ class ShaderDemoActivity : ComponentActivity() {
         private const val SLIM_FACE_STRENGTH_PROGRESS_MAX = 10
         private const val DEFAULT_BIG_EYE_STRENGTH = 0.15f
         private const val DEFAULT_SLIM_FACE_STRENGTH = 0.05f
+        private const val LIPSTICK_STRENGTH_MIN = 0f
+        private const val LIPSTICK_STRENGTH_MAX = 1f
+        private const val LIPSTICK_STRENGTH_STEP = 0.01f
+        private const val LIPSTICK_STRENGTH_PROGRESS_MAX = 100
+        private const val DEFAULT_LIPSTICK_STRENGTH = 0.8f
         private const val BLUR_STRENGTH_MIN = 0f
         private const val BLUR_STRENGTH_MAX = 1f
         private const val BLUR_STRENGTH_STEP = 0.01f
@@ -836,11 +912,13 @@ class ShaderDemoActivity : ComponentActivity() {
             initialBlackCircleStrength: Float,
             initialBigEyeStrength: Float,
             initialSlimFaceStrength: Float,
+            initialLipstickStrength: Float,
             showWhitenStrengthControl: Boolean,
             showBrightenStrengthControl: Boolean,
             showBlackCircleStrengthControl: Boolean,
             showBigEyeStrengthControl: Boolean,
             showSlimFaceStrengthControl: Boolean,
+            showLipstickStrengthControl: Boolean,
             showBlurStrengthControl: Boolean,
             showWarmthStrengthControl: Boolean,
             showSaturationStrengthControl: Boolean,
@@ -852,11 +930,13 @@ class ShaderDemoActivity : ComponentActivity() {
             putExtra(EXTRA_INITIAL_BLACK_CIRCLE_STRENGTH, initialBlackCircleStrength)
             putExtra(EXTRA_INITIAL_BIG_EYE_STRENGTH, initialBigEyeStrength)
             putExtra(EXTRA_INITIAL_SLIM_FACE_STRENGTH, initialSlimFaceStrength)
+            putExtra(EXTRA_INITIAL_LIPSTICK_STRENGTH, initialLipstickStrength)
             putExtra(EXTRA_SHOW_WHITEN_STRENGTH_CONTROL, showWhitenStrengthControl)
             putExtra(EXTRA_SHOW_BRIGHTEN_STRENGTH_CONTROL, showBrightenStrengthControl)
             putExtra(EXTRA_SHOW_BLACK_CIRCLE_STRENGTH_CONTROL, showBlackCircleStrengthControl)
             putExtra(EXTRA_SHOW_BIG_EYE_STRENGTH_CONTROL, showBigEyeStrengthControl)
             putExtra(EXTRA_SHOW_SLIM_FACE_STRENGTH_CONTROL, showSlimFaceStrengthControl)
+            putExtra(EXTRA_SHOW_LIPSTICK_STRENGTH_CONTROL, showLipstickStrengthControl)
             putExtra(EXTRA_SHOW_BLUR_STRENGTH_CONTROL, showBlurStrengthControl)
             putExtra(EXTRA_SHOW_WARMTH_STRENGTH_CONTROL, showWarmthStrengthControl)
             putExtra(EXTRA_SHOW_SATURATION_STRENGTH_CONTROL, showSaturationStrengthControl)

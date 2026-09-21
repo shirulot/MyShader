@@ -1,0 +1,17 @@
+MediaPipe Tasks Vision 1.0.0
+Copyright The MediaPipe Authors.
+https://github.com/google-ai-edge/mediapipe
+License: Apache License, Version 2.0 (see Apache-2.0.txt).
+The application uses the published SDK without modifying its source.
+
+Face Landmarker model bundle: float16/version 1
+https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+SHA-256: 64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff
+Model cards linked by the official Face Landmarker guide:
+https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker
+Face detector: MediaPipe BlazeFace (Short Range)
+Face landmarks: MediaPipe FaceMesh V2
+Expressions: MediaPipe Blendshape V2 (output disabled in this application)
+The original model bundle is redistributed without changes.
+
+This application is not affiliated with or endorsed by Google.

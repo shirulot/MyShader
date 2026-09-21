@@ -15,3 +15,6 @@
 local.properties
 # Kotlin 编译失败诊断日志属于本地构建产物。
 /.kotlin/errors/
+# 本次迁移的本地验证代码不进入提交。
+/app/src/test/java/com/shirulot/myshader/FaceAnalysisTest.kt
+/app/src/androidTest/java/com/shirulot/myshader/MediaPipeDetectionTest.kt

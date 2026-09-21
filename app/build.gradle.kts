@@ -49,7 +49,8 @@ dependencies {
     implementation(libs.androidx.recyclerview)
     // Android 协程运行时，提供 Dispatchers.Main 等 Android 调度器。
     implementation(libs.kotlinx.coroutines.android)
-    implementation(files("libs/gpupixel-release.aar"))
+    // 人脸检测改为 MediaPipe；本地 GPUPixel AAR 保留但不再打包。
+    implementation(libs.mediapipe.tasks.vision)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

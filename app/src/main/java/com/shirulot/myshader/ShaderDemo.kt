@@ -17,6 +17,8 @@ data class ShaderDemo(
     val initialBigEyeStrength: Float = 0.15f,
     // 瘦脸初值默认保持新的上限 0.05。
     val initialSlimFaceStrength: Float = 0.05f,
+    // 口红强度默认从当前教学值 0.80 开始。
+    val initialLipstickStrength: Float = 0.8f,
     // 滑条展示按 Demo 的实际最终输出决定；归档入口 Demo 时需同步对应控制配置。
     // 渲染器仍会安全忽略未声明的 uniform。
     val showWhitenStrengthControl: Boolean = false,
@@ -24,6 +26,7 @@ data class ShaderDemo(
     val showBlackCircleStrengthControl: Boolean = false,
     val showBigEyeStrengthControl: Boolean = false,
     val showSlimFaceStrengthControl: Boolean = false,
+    val showLipstickStrengthControl: Boolean = false,
     val showBlurStrengthControl: Boolean = false,
     // 暖色补正滑条控制 Shader 的 warmthStrength uniform。
     val showWarmthStrengthControl: Boolean = false,
@@ -41,14 +44,13 @@ data class ShaderDemoGroup(
 /** 集中维护 Demo 顺序，避免首页和渲染页各自保存一份映射。 */
 object ShaderDemoCatalog {
     val standaloneItems: List<ShaderDemo> = listOf(
-        // 当前 main.frag 使用 bigEyeStrength 控制双眼区域的 UV 放大，因此展示大眼滑条。
+        // 当前 main.frag 的最终输出使用 lipstickStrength 控制嘴唇混色，因此只展示口红滑条。
         ShaderDemo(
             R.string.demo_passthrough_title,
             R.string.demo_passthrough_description,
             "main.frag",
-            showSlimFaceStrengthControl = true,
-            initialBigEyeStrength = 0.15f,
-            showBigEyeStrengthControl = true,
+            initialLipstickStrength = 0.8f,
+            showLipstickStrengthControl = true,
         ),
     )
 
@@ -215,6 +217,31 @@ object ShaderDemoCatalog {
                     showBigEyeStrengthControl = true,
                     initialSlimFaceStrength = 0.05f,
                     showSlimFaceStrengthControl = true,
+                ),
+                // Demo 55 在大眼和瘦脸形变后增加 UV 边界保护，因此保留两个实际参与输出的滑条。
+                ShaderDemo(
+                    R.string.demo_55_title,
+                    R.string.demo_55_description,
+                    "shaders/face_shaping/demo_55_sdk_eye_slim_face_uv_bounds.frag",
+                    initialBigEyeStrength = 0.15f,
+                    showBigEyeStrengthControl = true,
+                    initialSlimFaceStrength = 0.05f,
+                    showSlimFaceStrengthControl = true,
+                ),
+            ),
+            initiallyExpanded = false,
+        ),
+        // 第八章从 SDK 嘴唇区域和目标色混合开始练习妆容。
+        ShaderDemoGroup(
+            titleRes = R.string.demo_group_makeup,
+            demos = listOf(
+                // Demo 56 使用 SDK 外唇轮廓计算权重并混合固定口红色，保留实际使用的口红滑条。
+                ShaderDemo(
+                    R.string.demo_56_title,
+                    R.string.demo_56_description,
+                    "shaders/makeup/demo_56_sdk_lipstick_mix.frag",
+                    initialLipstickStrength = 0.8f,
+                    showLipstickStrengthControl = true,
                 ),
             ),
             initiallyExpanded = false,

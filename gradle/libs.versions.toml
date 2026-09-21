@@ -12,8 +12,10 @@ composeBom = "2026.02.01"
 recyclerView = "1.4.0"
 appcompat = "1.6.1"
 material = "1.10.0"
+mediapipe = "1.0.0"
 
 [libraries]
+mediapipe-tasks-vision = { group = "com.google.mediapipe", name = "tasks-vision", version.ref = "mediapipe" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

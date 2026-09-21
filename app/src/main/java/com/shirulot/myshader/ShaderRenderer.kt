@@ -75,6 +75,11 @@ class ShaderSurfaceView(
         queueEvent { shaderRenderer.setSlimFaceStrength(value) }
     }
 
+    fun setLipstickStrength(value: Float) {
+        // 口红 SeekBar 回调来自主线程，uniform 状态必须在 GL 线程更新。
+        queueEvent { shaderRenderer.setLipstickStrength(value) }
+    }
+
     fun setWarmthStrength(value: Float) {
         // SeekBar 回调来自主线程，uniform 状态必须在 GL 线程更新。
         queueEvent { shaderRenderer.setWarmthStrength(value) }
@@ -184,6 +189,7 @@ private class ShaderRenderer(
     private var blackCircleStrength = DEFAULT_BLACK_CIRCLE_STRENGTH
     private var bigEyeStrength = DEFAULT_BIG_EYE_STRENGTH
     private var slimFaceStrength = DEFAULT_SLIM_FACE_STRENGTH
+    private var lipstickStrength = DEFAULT_LIPSTICK_STRENGTH
 
     private var warmthStrength = DEFAULT_WARMTH_STRENGTH
     private var saturationStrength = DEFAULT_SATURATION_STRENGTH
@@ -249,6 +255,7 @@ private class ShaderRenderer(
         val blackCircleStrengthLocation = GLES20.glGetUniformLocation(program, "blackCircleStrength")
         val bigEyeStrengthLocation = GLES20.glGetUniformLocation(program, "bigEyeStrength")
         val slimFaceStrengthLocation = GLES20.glGetUniformLocation(program, "slimFaceStrength")
+        val lipstickStrengthLocation = GLES20.glGetUniformLocation(program, "lipstickStrength")
         val blurStrengthLocation = GLES20.glGetUniformLocation(program, "blurStrength")
         val warmthStrengthLocation = GLES20.glGetUniformLocation(program, "warmthStrength")
         val saturationStrengthLocation = GLES20.glGetUniformLocation(program, "saturationStrength")
@@ -319,6 +326,10 @@ private class ShaderRenderer(
         // 只有声明 slimFaceStrength 的 Shader 才接收瘦脸强度。
         if (slimFaceStrengthLocation >= 0) {
             GLES20.glUniform1f(slimFaceStrengthLocation, slimFaceStrength)
+        }
+        // 只有声明 lipstickStrength 的 Shader 才接收口红强度。
+        if (lipstickStrengthLocation >= 0) {
+            GLES20.glUniform1f(lipstickStrengthLocation, lipstickStrength)
         }
         // 只有磨皮声明 blurStrength；其他 Shader 返回 -1，保持原有行为。
         if (blurStrengthLocation >= 0) {
@@ -411,6 +422,10 @@ private class ShaderRenderer(
 
     fun setSlimFaceStrength(value: Float) {
         slimFaceStrength = value.coerceIn(MIN_SLIM_FACE_STRENGTH, MAX_SLIM_FACE_STRENGTH)
+    }
+
+    fun setLipstickStrength(value: Float) {
+        lipstickStrength = value.coerceIn(MIN_LIPSTICK_STRENGTH, MAX_LIPSTICK_STRENGTH)
     }
 
     fun setWarmthStrength(value: Float) {
@@ -617,6 +632,9 @@ private class ShaderRenderer(
         const val MIN_SLIM_FACE_STRENGTH = 0f
         const val MAX_BIG_EYE_STRENGTH = 0.15f
         const val MAX_SLIM_FACE_STRENGTH = 0.05f
+        const val DEFAULT_LIPSTICK_STRENGTH = 0.8f
+        const val MIN_LIPSTICK_STRENGTH = 0f
+        const val MAX_LIPSTICK_STRENGTH = 1f
 
         const val DEFAULT_WARMTH_STRENGTH = 0f
         const val MIN_WARMTH_STRENGTH = 0f

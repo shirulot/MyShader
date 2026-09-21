@@ -1,50 +1,38 @@
 package com.shirulot.myshader
 
-import android.content.res.Resources
-import android.graphics.BitmapFactory
-import androidx.annotation.DrawableRes
-import com.pixpark.gpupixel.FaceDetector
-import com.pixpark.gpupixel.GPUPixelSourceImage
 import kotlin.math.abs
 
 
 object FaceAnalysis {
 
-    // GPUPixel 瘦脸算法使用的轮廓起点与内部目标点索引。
+    // MediaPipe 面部轮廓到鼻部中线的语义映射，并非 Mars 索引的一一对应。
+    // 保留原来的九组参数布局：左右四层轮廓 + 下巴，Shader 当前仍只使用前八组。
     private val SLIM_FACE_INDEX_PAIRS = arrayOf(
         // 左外侧
-        3 to 44,
+        234 to 168,
         // 右外侧
-        29 to 44,
+        454 to 168,
         // 左中侧
-        7 to 45,
+        132 to 6,
         // 右中侧
-        25 to 45,
+        361 to 6,
         // 左内侧
-        10 to 46,
+        172 to 197,
         // 右内侧
-        22 to 46,
+        397 to 197,
         // 左下颌
-        14 to 49,
+        150 to 1,
         // 右下颌
-        18 to 49,
+        379 to 1,
         // 下巴
-        16 to 49,
+        152 to 1,
     )
-    // 左眼中心
-    private const val LEFT_EYE_CENTER_INDEX = 74
-
-    // 右眼中心
-    private const val RIGHT_EYE_CENTER_INDEX = 77
-
-    // 左眼关键点
-    private val LEFT_EYE_BOUNDARY_INDICES = intArrayOf(52, 53, 54, 55, 56, 57, 72, 73)
-
-    // 右眼关键点
-    private val RIGHT_EYE_BOUNDARY_INDICES = intArrayOf(58, 59, 60, 61, 62, 63, 75, 76)
+    // 沿用画面左/右的命名；对应 MediaPipe 人物自身的右/左眼。
+    private val LEFT_EYE_BOUNDARY_INDICES = intArrayOf(33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246)
+    private val RIGHT_EYE_BOUNDARY_INDICES = intArrayOf(263, 249, 390, 373, 374, 380, 381, 382, 362, 398, 384, 385, 386, 387, 388, 466)
 
     // 外嘴唇轮廓关键点。
-    private val LIP_BOUNDARY_INDICES = intArrayOf(84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95)
+    private val LIP_BOUNDARY_INDICES = intArrayOf(61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185)
 
     /**
      * 计算嘴唇
@@ -67,8 +55,7 @@ object FaceAnalysis {
         val radius = FacePoint((maxX - minX) * 0.5f, (maxY - minY) * 0.5f)
         return FaceFeatureRegion(center, radius)
     }
-    private fun calculateFeatureRegion(landmarks: FloatArray, centerIndex: Int, boundaryIndices: IntArray): FaceFeatureRegion {
-        val center = getPoint(landmarks, centerIndex)
+    private fun calculateFeatureRegion(landmarks: FloatArray, center: FacePoint, boundaryIndices: IntArray): FaceFeatureRegion {
         var radiusX = 0f
         var radiusY = 0f
 
@@ -85,19 +72,26 @@ object FaceAnalysis {
      * 计算眼睛区域
      */
     fun calculateEyeRegions(landmarks: FloatArray): Pair<FaceFeatureRegion, FaceFeatureRegion> {
-        val left = calculateFeatureRegion(landmarks, LEFT_EYE_CENTER_INDEX, LEFT_EYE_BOUNDARY_INDICES)
-        val right = calculateFeatureRegion(landmarks, RIGHT_EYE_CENTER_INDEX, RIGHT_EYE_BOUNDARY_INDICES)
+        val centers = calculateEyeCenters(landmarks)
+        val left = calculateFeatureRegion(landmarks, centers.first, LEFT_EYE_BOUNDARY_INDICES)
+        val right = calculateFeatureRegion(landmarks, centers.second, RIGHT_EYE_BOUNDARY_INDICES)
         return left to right
     }
 
     fun getPoint(landmarks: FloatArray, pointIndex: Int): FacePoint {
         val offset = pointIndex * 2
-        require(offset + 1 < landmarks.size) { "关键点索引越界：$pointIndex" }
+        require(pointIndex >= 0 && offset + 1 < landmarks.size) { "关键点索引越界：$pointIndex" }
         return FacePoint(landmarks[offset], landmarks[offset + 1])
     }
 
     fun calculateEyeCenters(landmarks: FloatArray): Pair<FacePoint, FacePoint> {
-        return getPoint(landmarks, LEFT_EYE_CENTER_INDEX) to getPoint(landmarks, RIGHT_EYE_CENTER_INDEX)
+        // 用眼角中点而非虹膜中心，避免视线变化移动形变中心。
+        fun midpoint(first: Int, second: Int): FacePoint {
+            val a = getPoint(landmarks, first)
+            val b = getPoint(landmarks, second)
+            return FacePoint((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f)
+        }
+        return midpoint(33, 133) to midpoint(362, 263)
     }
 
     fun calculateFaceRegion(landmarks: FloatArray): FaceRegion {
@@ -124,39 +118,11 @@ object FaceAnalysis {
         )
     }
 
-    /** 检测当前选中的测试图片；串行调用原生检测器，避免快速切图时并发访问 SDK。 */
-    @Synchronized
-    fun detectLessonFace(resources: Resources, @DrawableRes imageRes: Int = R.drawable.lesson_face): FloatArray {
-        val bitmap = requireNotNull(
-            BitmapFactory.decodeResource(
-                resources,
-                imageRes,
-                BitmapFactory.Options().apply { inScaled = false },
-            ),
-        )
+    private const val REQUIRED_LANDMARK_COUNT = 478
 
-        // 使用 GPUPixel 原生路径转换 Bitmap，保证输入为 RGBA。
-        val sourceImage = GPUPixelSourceImage.CreateFromBitmap(bitmap)
-        // 静态练习图必须以图片模式创建检测器。
-        val detector = FaceDetector.Create(FaceDetector.GPUPIXEL_MODE_FMT_PICTURE)
-
-        return try {
-            detector.detect(
-                requireNotNull(sourceImage.GetRgbaImageBuffer()),
-                sourceImage.GetWidth(),
-                sourceImage.GetHeight(),
-                sourceImage.GetWidth() * 4,
-                FaceDetector.GPUPIXEL_MODE_FMT_PICTURE,
-                FaceDetector.GPUPIXEL_FRAME_TYPE_RGBA,
-            )
-        } finally {
-            detector.destroy()
-            sourceImage.Destroy()
-            bitmap.recycle()
-        }
-    }
-
-    private const val REQUIRED_LANDMARK_COUNT = 111
+    /** 保留检测到的真实人数，只有恰好一张有效脸才能驱动当前单脸 Shader。 */
+    fun singleFaceOrNull(faces: List<FloatArray>): FloatArray? =
+        faces.singleOrNull()?.takeIf(::hasValidLandmarks)
 
     fun hasValidLandmarks(landmarks: FloatArray): Boolean {
         // 当前渲染链只接收完整的一张脸，拒绝多脸拼接数据，避免脸框和五官串用。
