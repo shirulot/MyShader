@@ -34,6 +34,21 @@ object FaceAnalysis {
     // 外嘴唇轮廓关键点。
     private val LIP_BOUNDARY_INDICES = intArrayOf(61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185)
 
+    // 内嘴轮廓关键点，后续从外唇权重中扣除口腔区域。
+    private val INNER_LIP_BOUNDARY_INDICES = intArrayOf(
+        78, 95, 88, 178, 87, 14, 317, 402, 318, 324,
+        308, 415, 310, 311, 312, 13, 82, 81, 80, 191,
+    )
+
+    /** 按闭合边界顺序打包外唇、内嘴坐标，每两个 Float 对应一个 Shader vec2。 */
+    fun calculateLipContours(landmarks: FloatArray): Pair<FloatArray, FloatArray> {
+        require(hasValidLandmarks(landmarks)) { "嘴唇关键点数据无效" }
+        fun pack(indices: IntArray): FloatArray = FloatArray(indices.size * 2) { offset ->
+            landmarks[indices[offset / 2] * 2 + offset % 2]
+        }
+        return pack(LIP_BOUNDARY_INDICES) to pack(INNER_LIP_BOUNDARY_INDICES)
+    }
+
     /**
      * 计算嘴唇
      */
@@ -55,6 +70,17 @@ object FaceAnalysis {
         val radius = FacePoint((maxX - minX) * 0.5f, (maxY - minY) * 0.5f)
         return FaceFeatureRegion(center, radius)
     }
+
+    /** 计算内嘴区域，使用左右嘴角与上下内唇点建立中心，再复用区域半径计算。 */
+    fun calculateInnerLipRegion(landmarks: FloatArray): FaceFeatureRegion {
+        val left = getPoint(landmarks, 78)
+        val right = getPoint(landmarks, 308)
+        val top = getPoint(landmarks, 13)
+        val bottom = getPoint(landmarks, 14)
+        val center = FacePoint((left.x + right.x) * 0.5f, (top.y + bottom.y) * 0.5f)
+        return calculateFeatureRegion(landmarks, center, INNER_LIP_BOUNDARY_INDICES)
+    }
+
     private fun calculateFeatureRegion(landmarks: FloatArray, center: FacePoint, boundaryIndices: IntArray): FaceFeatureRegion {
         var radiusX = 0f
         var radiusY = 0f

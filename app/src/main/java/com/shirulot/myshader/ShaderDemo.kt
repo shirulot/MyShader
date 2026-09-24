@@ -243,6 +243,22 @@ object ShaderDemoCatalog {
                     initialLipstickStrength = 0.8f,
                     showLipstickStrengthControl = true,
                 ),
+                // Demo 57 使用外唇与内嘴多边形轮廓生成口红区域，保留实际使用的口红滑条。
+                ShaderDemo(
+                    R.string.demo_57_title,
+                    R.string.demo_57_description,
+                    "shaders/makeup/demo_57_outer_inner_lip_polygon_mask.frag",
+                    initialLipstickStrength = 0.8f,
+                    showLipstickStrengthControl = true,
+                ),
+                // Demo 58 使用平滑后的嘴唇轮廓和包围盒保护，口红强度仍参与最终输出。
+                ShaderDemo(
+                    R.string.demo_58_title,
+                    R.string.demo_58_description,
+                    "shaders/makeup/demo_58_smoothed_lip_contour_feather.frag",
+                    initialLipstickStrength = 0.8f,
+                    showLipstickStrengthControl = true,
+                ),
             ),
             initiallyExpanded = false,
         ),

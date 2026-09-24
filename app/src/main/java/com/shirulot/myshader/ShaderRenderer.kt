@@ -109,13 +109,17 @@ class ShaderSurfaceView(
         face: FaceRegion,
         eyes: Pair<FaceFeatureRegion, FaceFeatureRegion>,
         lip: FaceFeatureRegion,
+        innerLip: FaceFeatureRegion,
         slimPairs: List<FaceWarpPair>,
+        lipContours: Pair<FloatArray, FloatArray>,
     ) {
         queueEvent {
             shaderRenderer.clearFaceAnalysis()
             shaderRenderer.setSlimFacePairs(slimPairs)
             shaderRenderer.setEyeRegions(eyes.first, eyes.second)
             shaderRenderer.setLipRegions(lip)
+            shaderRenderer.setInnerLipRegions(innerLip)
+            shaderRenderer.setLipContours(lipContours)
             shaderRenderer.setFaceCenter(face.centerX, face.centerY, face.width, face.height)
         }
     }
@@ -128,6 +132,11 @@ class ShaderSurfaceView(
     fun setLipRegions(lipRegion: FaceFeatureRegion) {
         // 人脸分析结果统一在 GL 线程更新。
         queueEvent { shaderRenderer.setLipRegions(lipRegion) }
+    }
+
+    fun setInnerLipRegions(innerLipRegion: FaceFeatureRegion) {
+        // 内嘴区域与外唇区域一样，只在 GL 线程更新，供后续 Shader 扣除口腔权重。
+        queueEvent { shaderRenderer.setInnerLipRegions(innerLipRegion) }
     }
 
     fun clearFaceAnalysis() {
@@ -158,6 +167,13 @@ private class ShaderRenderer(
     private var leftEyeRegion = FaceFeatureRegion(FacePoint(0.36f, 0.41f), FacePoint(0.062f, 0.016f))
     private var rightEyeRegion = FaceFeatureRegion(FacePoint(0.65f, 0.41f), FacePoint(0.062f, 0.016f))
     private var lipRegion = FaceFeatureRegion(FacePoint(0.50f, 0.62f), FacePoint(0.112f, 0.029f))
+    private var innerLipRegion = FaceFeatureRegion(FacePoint(0.50f, 0.62f), FacePoint(0.04f, 0.012f))
+    // 两条闭合轮廓各包含 20 个点，未检测时由 faceCenterReady 关闭效果。
+    private val outerLipPoints = FloatArray(40)
+    private val innerLipPoints = FloatArray(40)
+    // 平滑轮廓使用独立 uniform，保持旧版 20 点 Demo 的数据布局。
+    private var smoothOuterLipPoints = FloatArray(LipContourSmoother.OUTPUT_POINT_COUNT * 2)
+    private var smoothInnerLipPoints = FloatArray(LipContourSmoother.OUTPUT_POINT_COUNT * 2)
     private val mainHandler = Handler(Looper.getMainLooper())
     private val positionBuffer = createFloatBuffer(
         floatArrayOf(
@@ -271,6 +287,13 @@ private class ShaderRenderer(
 
         val lipCenterLocation = GLES20.glGetUniformLocation(program, "lipCenter")
         val lipRadiusLocation = GLES20.glGetUniformLocation(program, "lipRadius")
+        val innerLipCenterLocation = GLES20.glGetUniformLocation(program, "innerLipCenter")
+        val innerLipRadiusLocation = GLES20.glGetUniformLocation(program, "innerLipRadius")
+        // 数组从首元素查询；旧 Shader 未声明时返回 -1，跳过上传。
+        val outerLipPointsLocation = GLES20.glGetUniformLocation(program, "outerLipPoints[0]")
+        val innerLipPointsLocation = GLES20.glGetUniformLocation(program, "innerLipPoints[0]")
+        val smoothOuterLocation = GLES20.glGetUniformLocation(program, "smoothOuterLipPoints[0]")
+        val smoothInnerLocation = GLES20.glGetUniformLocation(program, "smoothInnerLipPoints[0]")
 
         //瘦脸-脸轮廓点
         val slimOriginsLocation = GLES20.glGetUniformLocation(program, "slimOrigins[0]")
@@ -355,6 +378,14 @@ private class ShaderRenderer(
         if (rightEyeRadiusLocation >= 0) GLES20.glUniform2f(rightEyeRadiusLocation, rightEyeRegion.radius.x, rightEyeRegion.radius.y)
         if (lipRadiusLocation >= 0) GLES20.glUniform2f(lipRadiusLocation, lipRegion.radius.x, lipRegion.radius.y)
         if (lipCenterLocation >= 0) GLES20.glUniform2f(lipCenterLocation, lipRegion.center.x, lipRegion.center.y)
+        if (innerLipRadiusLocation >= 0) GLES20.glUniform2f(innerLipRadiusLocation, innerLipRegion.radius.x, innerLipRegion.radius.y)
+        if (innerLipCenterLocation >= 0) GLES20.glUniform2f(innerLipCenterLocation, innerLipRegion.center.x, innerLipRegion.center.y)
+        // 每个点使用原检测 UV，不再压缩成椭圆中心和半径。
+        if (outerLipPointsLocation >= 0) GLES20.glUniform2fv(outerLipPointsLocation, 20, outerLipPoints, 0)
+        if (innerLipPointsLocation >= 0) GLES20.glUniform2fv(innerLipPointsLocation, 20, innerLipPoints, 0)
+        // 仅在 Shader 使用平滑数组时上传，原始轮廓仍可用于对照。
+        if (smoothOuterLocation >= 0) GLES20.glUniform2fv(smoothOuterLocation, LipContourSmoother.OUTPUT_POINT_COUNT, smoothOuterLipPoints, 0)
+        if (smoothInnerLocation >= 0) GLES20.glUniform2fv(smoothInnerLocation, LipContourSmoother.OUTPUT_POINT_COUNT, smoothInnerLipPoints, 0)
 
         if (faceCenterReadyLocation >= 0) {
             GLES20.glUniform1f(faceCenterReadyLocation, if (faceCenterReady) 1f else 0f)
@@ -609,6 +640,20 @@ private class ShaderRenderer(
 
     fun setLipRegions(lipRegion: FaceFeatureRegion) {
         this.lipRegion = lipRegion
+    }
+
+    fun setInnerLipRegions(innerLipRegion: FaceFeatureRegion) {
+        this.innerLipRegion = innerLipRegion
+    }
+
+    /** 在同一次 GL 更新中保存两条轮廓，避免与当前图片的人脸数据错配。 */
+    fun setLipContours(contours: Pair<FloatArray, FloatArray>) {
+        require(contours.first.size == outerLipPoints.size && contours.second.size == innerLipPoints.size)
+        contours.first.copyInto(outerLipPoints)
+        contours.second.copyInto(innerLipPoints)
+        // 静态图片检测完成后计算一次，不在每个绘制帧中重复插值。
+        smoothOuterLipPoints = LipContourSmoother.smooth(contours.first)
+        smoothInnerLipPoints = LipContourSmoother.smooth(contours.second)
     }
 
     fun clearFaceAnalysis() {

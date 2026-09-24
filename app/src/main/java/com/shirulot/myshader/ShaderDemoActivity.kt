@@ -345,10 +345,13 @@ class ShaderDemoActivity : ComponentActivity() {
                 val face = FaceAnalysis.calculateFaceRegion(landmarks)
                 val eyes = FaceAnalysis.calculateEyeRegions(landmarks)
                 val lip = FaceAnalysis.calculateLipRegion(landmarks)
+                val innerLip = FaceAnalysis.calculateInnerLipRegion(landmarks)
+                // 保留完整边界点，供 Shader 表现唇峰和内嘴形状。
+                val lipContours = FaceAnalysis.calculateLipContours(landmarks)
                 val slimPairs = FaceAnalysis.calculateSlimFacePairs(landmarks)
-                shaderSurfaceView.setFaceAnalysis(face, eyes, lip, slimPairs)
+                shaderSurfaceView.setFaceAnalysis(face, eyes, lip, innerLip, slimPairs, lipContours)
                 Log.i("FaceAnalysis", "image=$imageName, pointCount=${landmarks.size / 2}, center=$face")
-                Log.i("FaceAnalysis", "leftEye=${eyes.first}, rightEye=${eyes.second}, lipRegion=$lip")
+                Log.i("FaceAnalysis", "leftEye=${eyes.first}, rightEye=${eyes.second}, lipRegion=$lip, innerLipRegion=$innerLip")
                 slimPairs.forEachIndexed { index, pair ->
                     Log.i("FaceAnalysis", "slimPair[$index]=${pair.origin} -> ${pair.target}")
                 }
@@ -373,16 +376,20 @@ class ShaderDemoActivity : ComponentActivity() {
         val originalImageButton = sourceImageRadioButton(R.string.shader_demo_source_image_original)
         val detailImageButton = sourceImageRadioButton(R.string.shader_demo_source_image_detail)
         val twoFacesButton = sourceImageRadioButton(R.string.shader_demo_source_image_two_faces)
+        // 张嘴样本用于检查口红遮罩是否避开牙齿和口腔。
+        val openMouthButton = sourceImageRadioButton(R.string.shader_demo_source_image_open_mouth)
         val sourceImageGroup = RadioGroup(this).apply {
             orientation = RadioGroup.HORIZONTAL
             addView(originalImageButton)
             addView(detailImageButton)
             addView(twoFacesButton)
+            addView(openMouthButton)
             setOnCheckedChangeListener { _, checkedId ->
                 val selectedImageRes = when (checkedId) {
                     originalImageButton.id -> R.drawable.lesson_face
                     detailImageButton.id -> R.drawable.lesson_face_detail
                     twoFacesButton.id -> R.drawable.lesson_two_faces
+                    openMouthButton.id -> R.drawable.lesson_open_mouth
                     else -> return@setOnCheckedChangeListener
                 }
                 // 所有图片统一走纹理切换和重新检测入口。
@@ -398,8 +405,12 @@ class ShaderDemoActivity : ComponentActivity() {
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             ).apply { topMargin = dp(8) },
         )
+        // 图片选项增多时允许横向滚动，避免窄屏裁掉最后一个选项。
+        val sourceImageScroll = android.widget.HorizontalScrollView(this).apply {
+            addView(sourceImageGroup)
+        }
         panel.addView(
-            sourceImageGroup,
+            sourceImageScroll,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
