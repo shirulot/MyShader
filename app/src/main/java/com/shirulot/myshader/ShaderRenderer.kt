@@ -668,18 +668,18 @@ private class ShaderRenderer(
         const val DEFAULT_BRIGHTEN_STRENGTH = 0f
         const val MIN_BRIGHTEN_STRENGTH = 0f
         const val MAX_BRIGHTEN_STRENGTH = 1f
-        const val DEFAULT_BLACK_CIRCLE_STRENGTH = 0.12f
+        const val DEFAULT_BLACK_CIRCLE_STRENGTH = 0f
         const val MIN_BLACK_CIRCLE_STRENGTH = 0f
         const val MAX_BLACK_CIRCLE_STRENGTH = 0.15f
-        const val DEFAULT_BIG_EYE_STRENGTH = 0.15f
-        const val DEFAULT_SLIM_FACE_STRENGTH = 0.05f
+        const val DEFAULT_BIG_EYE_STRENGTH = 0f
+        const val DEFAULT_SLIM_FACE_STRENGTH = 0f
         const val MIN_BIG_EYE_STRENGTH = 0f
         const val MIN_SLIM_FACE_STRENGTH = 0f
         const val MAX_BIG_EYE_STRENGTH = 0.15f
         const val MAX_SLIM_FACE_STRENGTH = 0.05f
-        const val DEFAULT_LIPSTICK_STRENGTH = 0.8f
+        const val DEFAULT_LIPSTICK_STRENGTH = 0f
         const val MIN_LIPSTICK_STRENGTH = 0f
-        const val MAX_LIPSTICK_STRENGTH = 1f
+        const val MAX_LIPSTICK_STRENGTH = 0.5f
 
         const val DEFAULT_WARMTH_STRENGTH = 0f
         const val MIN_WARMTH_STRENGTH = 0f

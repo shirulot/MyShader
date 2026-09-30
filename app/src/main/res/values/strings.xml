@@ -29,7 +29,7 @@
     <string name="shader_demo_big_eye_strength_content_description">大眼强度，范围 0.00 到 0.15，步长 0.005</string>
     <string name="shader_demo_slim_face_strength_content_description">瘦脸强度，范围 0.00 到 0.05，步长 0.005</string>
     <string name="shader_demo_lipstick_strength_label">口红：%1$.2f</string>
-    <string name="shader_demo_lipstick_strength_content_description">口红强度，范围 0.00 到 1.00，步长 0.01</string>
+    <string name="shader_demo_lipstick_strength_content_description">口红强度，范围 0.00 到 0.50，步长 0.01</string>
     <string name="shader_demo_blur_strength_label">磨皮强度：%1$.2f</string>
     <string name="shader_demo_blur_strength_content_description">磨皮强度，范围 0.00 到 1.00</string>
     <string name="shader_demo_warmth_strength_label">暖色补正：%1$.2f</string>
@@ -49,7 +49,7 @@
     </plurals>
 
     <string name="demo_passthrough_title">原图直通</string>
-    <string name="demo_passthrough_description">用于继续编辑当前 main.frag；当前使用平滑后的外唇和内嘴轮廓计算口红遮罩，并在嘴唇包围盒外直接保留原图。口红滑条范围为 0.00 到 1.00，步长为 0.01。</string>
+    <string name="demo_passthrough_description">用于继续编辑当前 main.frag；当前使用平滑后的外唇和内嘴轮廓计算口红遮罩，并在嘴唇包围盒外直接保留原图。口红滑条范围为 0.00 到 0.50，默认值为 0.00，步长为 0.01。</string>
     <string name="demo_01_title">Demo 1 · 固定红色</string>
     <string name="demo_01_description">保留原图透明度，将每个片元的 RGB 输出为红色。</string>
     <string name="demo_02_title">Demo 2 · UV 红绿渐变</string>
@@ -169,9 +169,9 @@
     <string name="demo_55_title">Demo 55 · 大眼瘦脸 UV 边界保护</string>
     <string name="demo_55_description">在大眼和九组轮廓瘦脸形变后检查采样 UV 是否仍在 0 到 1 范围，越界时回退到原图坐标；大眼和瘦脸滑条步长均为 0.005。</string>
     <string name="demo_56_title">Demo 56 · SDK 嘴唇区域口红混色</string>
-    <string name="demo_56_description">使用 SDK 外唇轮廓中心和半径生成羽化嘴唇权重，将固定口红目标色与原图混合；口红滑条范围为 0.00 到 1.00，步长为 0.01。</string>
+    <string name="demo_56_description">使用 SDK 外唇轮廓中心和半径生成羽化嘴唇权重，将固定口红目标色与原图混合；口红滑条范围为 0.00 到 0.50，默认值为 0.00，步长为 0.01。</string>
     <string name="demo_57_title">Demo 57 · 外唇与内嘴多边形口红遮罩</string>
-    <string name="demo_57_description">使用 SDK 外唇和内嘴各 20 个轮廓点判断区域，并按到内外边界的距离羽化，再混合固定口红色；口红滑条范围为 0.00 到 1.00，步长为 0.01。</string>
+    <string name="demo_57_description">使用 SDK 外唇和内嘴各 20 个轮廓点判断区域，并按到内外边界的距离羽化，再混合固定口红色；口红滑条范围为 0.00 到 0.50，默认值为 0.00，步长为 0.01。</string>
     <string name="demo_58_title">Demo 58 · 平滑唇形轮廓与边界羽化</string>
-    <string name="demo_58_description">将 SDK 外唇和内嘴各 20 个点经 Android 端曲线插值扩为 40 点；Shader 用嘴唇包围盒保护外部像素，再按多边形边界羽化混合固定口红色。口红滑条范围为 0.00 到 1.00，步长为 0.01。</string>
+    <string name="demo_58_description">将 SDK 外唇和内嘴各 20 个点经 Android 端曲线插值扩为 40 点；Shader 用嘴唇包围盒保护外部像素，再按多边形边界羽化混合固定口红色。口红滑条范围为 0.00 到 0.50，默认值为 0.00，步长为 0.01。</string>
 </resources>

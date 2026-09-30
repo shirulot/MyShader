@@ -11,14 +11,12 @@ data class ShaderDemo(
     val initialWhitenStrength: Float = 0f,
     // 提亮默认关闭；未声明 brightenStrength 的 Shader 不受影响。
     val initialBrightenStrength: Float = 0f,
-    // 主练习的黑眼圈提亮系数默认从 0.12 开始。
-    val initialBlackCircleStrength: Float = 0.12f,
-    // 主练习的大眼强度默认保持新的上限 0.15。
-    val initialBigEyeStrength: Float = 0.15f,
-    // 瘦脸初值默认保持新的上限 0.05。
-    val initialSlimFaceStrength: Float = 0.05f,
-    // 口红强度默认从当前教学值 0.80 开始。
-    val initialLipstickStrength: Float = 0.8f,
+    // 人脸类效果默认关闭；未声明对应 uniform 的 Shader 不受影响。
+    val initialBlackCircleStrength: Float = 0f,
+    val initialBigEyeStrength: Float = 0f,
+    val initialSlimFaceStrength: Float = 0f,
+    // 所有口红 Demo 默认关闭染色效果。
+    val initialLipstickStrength: Float = 0f,
     // 滑条展示按 Demo 的实际最终输出决定；归档入口 Demo 时需同步对应控制配置。
     // 渲染器仍会安全忽略未声明的 uniform。
     val showWhitenStrengthControl: Boolean = false,
@@ -49,7 +47,7 @@ object ShaderDemoCatalog {
             R.string.demo_passthrough_title,
             R.string.demo_passthrough_description,
             "main.frag",
-            initialLipstickStrength = 0.8f,
+            initialLipstickStrength = 0f,
             showLipstickStrengthControl = true,
         ),
     )
@@ -164,7 +162,7 @@ object ShaderDemoCatalog {
                     R.string.demo_48_title,
                     R.string.demo_48_description,
                     "shaders/face_analysis_and_mask/demo_48_under_eye_black_circle_brightening.frag",
-                    initialBlackCircleStrength = 0.12f,
+                    initialBlackCircleStrength = 0f,
                     showBlackCircleStrengthControl = true,
                 ),
                 // Demo 49 使用 SDK 双眼中心与半径；最终输出受黑眼圈强度控制，因此保留对应滑条。
@@ -172,7 +170,7 @@ object ShaderDemoCatalog {
                     R.string.demo_49_title,
                     R.string.demo_49_description,
                     "shaders/face_analysis_and_mask/demo_49_sdk_eye_under_eye_brightening.frag",
-                    initialBlackCircleStrength = 0.12f,
+                    initialBlackCircleStrength = 0f,
                     showBlackCircleStrengthControl = true,
                 ),
             ),
@@ -205,7 +203,7 @@ object ShaderDemoCatalog {
                     R.string.demo_53_title,
                     R.string.demo_53_description,
                     "shaders/face_shaping/demo_53_sdk_both_eye_uv_scale.frag",
-                    initialBigEyeStrength = 0.15f,
+                    initialBigEyeStrength = 0f,
                     showBigEyeStrengthControl = true,
                 ),
                 // Demo 54 归档当前 main.frag 的双眼放大与轮廓瘦脸版本，因此保留两个实际参与输出的滑条。
@@ -213,9 +211,9 @@ object ShaderDemoCatalog {
                     R.string.demo_54_title,
                     R.string.demo_54_description,
                     "shaders/face_shaping/demo_54_sdk_eye_and_slim_face_uv_warp.frag",
-                    initialBigEyeStrength = 0.15f,
+                    initialBigEyeStrength = 0f,
                     showBigEyeStrengthControl = true,
-                    initialSlimFaceStrength = 0.05f,
+                    initialSlimFaceStrength = 0f,
                     showSlimFaceStrengthControl = true,
                 ),
                 // Demo 55 在大眼和瘦脸形变后增加 UV 边界保护，因此保留两个实际参与输出的滑条。
@@ -223,9 +221,9 @@ object ShaderDemoCatalog {
                     R.string.demo_55_title,
                     R.string.demo_55_description,
                     "shaders/face_shaping/demo_55_sdk_eye_slim_face_uv_bounds.frag",
-                    initialBigEyeStrength = 0.15f,
+                    initialBigEyeStrength = 0f,
                     showBigEyeStrengthControl = true,
-                    initialSlimFaceStrength = 0.05f,
+                    initialSlimFaceStrength = 0f,
                     showSlimFaceStrengthControl = true,
                 ),
             ),
@@ -240,7 +238,7 @@ object ShaderDemoCatalog {
                     R.string.demo_56_title,
                     R.string.demo_56_description,
                     "shaders/makeup/demo_56_sdk_lipstick_mix.frag",
-                    initialLipstickStrength = 0.8f,
+                    initialLipstickStrength = 0f,
                     showLipstickStrengthControl = true,
                 ),
                 // Demo 57 使用外唇与内嘴多边形轮廓生成口红区域，保留实际使用的口红滑条。
@@ -248,7 +246,7 @@ object ShaderDemoCatalog {
                     R.string.demo_57_title,
                     R.string.demo_57_description,
                     "shaders/makeup/demo_57_outer_inner_lip_polygon_mask.frag",
-                    initialLipstickStrength = 0.8f,
+                    initialLipstickStrength = 0f,
                     showLipstickStrengthControl = true,
                 ),
                 // Demo 58 使用平滑后的嘴唇轮廓和包围盒保护，口红强度仍参与最终输出。
@@ -256,7 +254,7 @@ object ShaderDemoCatalog {
                     R.string.demo_58_title,
                     R.string.demo_58_description,
                     "shaders/makeup/demo_58_smoothed_lip_contour_feather.frag",
-                    initialLipstickStrength = 0.8f,
+                    initialLipstickStrength = 0f,
                     showLipstickStrengthControl = true,
                 ),
             ),

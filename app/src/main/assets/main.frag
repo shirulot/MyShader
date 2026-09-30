@@ -8,7 +8,7 @@ uniform float blackCircleStrength;
 uniform float bigEyeStrength;
 // 瘦脸滑条控制轮廓向内部收缩的强度，范围为 0.00--0.05，步长为 0.005。
 uniform float slimFaceStrength;
-// 口红滑条控制目标色混入原图的强度，范围由 Android 端限制为 0.00--1.00。
+// 口红滑条控制目标色混入原图的强度，范围由 Android 端限制为 0.00--0.50。
 uniform float lipstickStrength;
 varying vec2 textureCoordinate;
 
@@ -141,8 +141,7 @@ vec2 getSlimFaceUv(vec2 uv, vec2 origin, vec2 target) {
 float insideUv(vec2 value){
     return step(0.0, value.x) * step(value.x, 1.0) * step(0.0, value.y) * step(value.y, 1.0);
 }
-
-// 前置声明：多边形计算会先调用后面定义的线段距离函数。
+// 提前声明后面的距离函数，供轮廓函数调用。
 float getSegmentDistance(vec2 p, vec2 a, vec2 b);
 
 // 当前UV坐标向单一方向延长后看会和边界的两点相邻的支线相交多少次 如果奇数次则代表在内 否则在外
@@ -152,8 +151,8 @@ vec2 getPolygonInfo(vec2 uv, vec2 lipPoints[40]) {
     // UV 范围内的距离小于 2，先用较大值初始化。
     float minDistance = 2.0;
     // 从最后一个点开始，让第一条边连接最后一点与第一点。
-    vec2 a = lipPoints[lipPoints.length() - 1];
-    for (int i = 0; i < lipPoints.length(); i++) {
+    vec2 a = lipPoints[39];
+    for (int i = 0; i < 40; i++) {
         vec2 b = lipPoints[i];
         // 每条边都计算距离，保留最小值。
         float edgeDistance = getSegmentDistance(uv, a, b);
@@ -193,7 +192,12 @@ float getSegmentDistance(vec2 p, vec2 a, vec2 b) {
     //    // AQ 占整条 AB 的比例
     //    float t = aq / max(abLength, 0.00000001);
     // 投影得到最近位置的进度，并避免两个端点重合时除以零。
-    float t = dot(ap, ab) / max(dot(ab, ab), 0.00000001);
+    // 计算线段长度的平方。
+    float abLengthSquared = dot(ab, ab);
+    // 长度平方为零时按一个点处理，避免除零。
+    if (abLengthSquared <= 0.0) return length(ap);
+    // 使用原始平方长度计算投影比例。
+    float t = dot(ap, ab) / abLengthSquared;
     // 将位置限制在线段内部，避免落到延长线上。
     t = clamp(t, 0.0, 1.0);
     // 得到线段上最近的点Q = 垂足坐标
@@ -203,12 +207,13 @@ float getSegmentDistance(vec2 p, vec2 a, vec2 b) {
 }
 
 void main() {
+    vec2 uv = textureCoordinate;
     // 读取原图 alpha，保持 inputImageTexture 处于实际使用状态。
-    vec4 sourceColor = texture2D(inputImageTexture, textureCoordinate);
+    vec4 sourceColor = texture2D(inputImageTexture, uv);
 
     // 用宽松包围盒筛掉远离嘴唇的像素，留出曲线插值的余量。
     vec2 lipBounds = lipRadius * 1.5;
-    vec2 lipDelta = abs(textureCoordinate - lipCenter);
+    vec2 lipDelta = abs(uv - lipCenter);
     // 当前显示黑白遮罩，区域外直接输出黑色。
     if (faceCenterReady < 0.5 || lipDelta.x > lipBounds.x || lipDelta.y > lipBounds.y) {
         gl_FragColor = sourceColor;
@@ -216,8 +221,8 @@ void main() {
     }
 
     // 分别计算外唇和内嘴的内外状态、边界距离。
-    vec2 outerInfo = getPolygonInfo(textureCoordinate, smoothOuterLipPoints);
-    vec2 innerInfo = getPolygonInfo(textureCoordinate, smoothInnerLipPoints);
+    vec2 outerInfo = getPolygonInfo(uv, smoothOuterLipPoints);
+    vec2 innerInfo = getPolygonInfo(uv, smoothInnerLipPoints);
 
     // 外唇以内、内嘴以外，才是需要染色的区域。
     float lipWeight = outerInfo.x * (1.0 - innerInfo.x) * faceCenterReady;
@@ -231,12 +236,13 @@ void main() {
     // 得到带柔和边缘的最终嘴唇权重。
     float softLipWeight = lipWeight * fade;
     // 再次限制外部参数，避免异常值让颜色混合超出预期。
-    float safeLipstickStrength = clamp(lipstickStrength, 0.0, 1.0);
+    float safeLipstickStrength = clamp(lipstickStrength, 0.0, 0.5);
     // 使用羽化后的权重控制口红混色。
     vec3 resultColor = mix(sourceColor.rgb, lipstickColor, softLipWeight * safeLipstickStrength);
     // 显示羽化后的遮罩：白色染色，黑色不染色，灰色部分染色。
     gl_FragColor = vec4(resultColor, sourceColor.a);
 }
+
 // 详细查看 [res/drawable/hue_color_ring.png]
 // 将 RGB 转换为 0--1 范围的 HSV 色相 H。
 float getHue(vec3 color) {

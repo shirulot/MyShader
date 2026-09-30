@@ -1,6 +1,6 @@
 precision mediump float;
 uniform sampler2D inputImageTexture;
-// 口红滑条控制目标色混入原图的强度，范围由 Android 端限制为 0.00--1.00，步长为 0.01。
+// 口红滑条控制目标色混入原图的强度，范围由 Android 端限制为 0.00--0.50，步长为 0.01。
 uniform float lipstickStrength;
 varying vec2 textureCoordinate;
 
@@ -22,7 +22,7 @@ void main() {
     // 选择一个固定的口红目标色。
     vec3 lipstickColor = vec3(0.78, 0.06, 0.16);
     // 再次限制外部参数，避免异常值让颜色混合超出预期。
-    float safeLipstickStrength = clamp(lipstickStrength, 0.0, 1.0);
+    float safeLipstickStrength = clamp(lipstickStrength, 0.0, 0.5);
     // 按嘴唇权重把原图与目标色混合。
     vec3 resultColor = mix(sourceColor.rgb, lipstickColor, lipWeight * safeLipstickStrength);
     // 输出混合结果，保留原图透明度。

@@ -625,7 +625,7 @@ class ShaderDemoActivity : ComponentActivity() {
         )
     }
 
-    /** 将口红强度按 0.01 步长映射为 0.00 到 1.00，并上传给 Shader uniform。 */
+    /** 将口红强度按 0.01 步长映射为 0.00 到 0.50，并上传给 Shader uniform。 */
     private fun addLipstickStrengthControl(panel: LinearLayout, initialValue: Float) {
         val strengthText = TextView(this).apply {
             setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
@@ -876,7 +876,7 @@ class ShaderDemoActivity : ComponentActivity() {
         private const val BLACK_CIRCLE_STRENGTH_MAX = 0.15f
         private const val BLACK_CIRCLE_STRENGTH_STEP = 0.01f
         private const val BLACK_CIRCLE_STRENGTH_PROGRESS_MAX = 15
-        private const val DEFAULT_BLACK_CIRCLE_STRENGTH = 0.12f
+        private const val DEFAULT_BLACK_CIRCLE_STRENGTH = 0f
         private const val BIG_EYE_STRENGTH_MIN = 0f
         private const val SLIM_FACE_STRENGTH_MIN = 0f
         private const val BIG_EYE_STRENGTH_MAX = 0.15f
@@ -885,13 +885,13 @@ class ShaderDemoActivity : ComponentActivity() {
         private const val SLIM_FACE_STRENGTH_STEP = 0.005f
         private const val BIG_EYE_STRENGTH_PROGRESS_MAX = 30
         private const val SLIM_FACE_STRENGTH_PROGRESS_MAX = 10
-        private const val DEFAULT_BIG_EYE_STRENGTH = 0.15f
-        private const val DEFAULT_SLIM_FACE_STRENGTH = 0.05f
+        private const val DEFAULT_BIG_EYE_STRENGTH = 0f
+        private const val DEFAULT_SLIM_FACE_STRENGTH = 0f
         private const val LIPSTICK_STRENGTH_MIN = 0f
-        private const val LIPSTICK_STRENGTH_MAX = 1f
+        private const val LIPSTICK_STRENGTH_MAX = 0.5f
         private const val LIPSTICK_STRENGTH_STEP = 0.01f
-        private const val LIPSTICK_STRENGTH_PROGRESS_MAX = 100
-        private const val DEFAULT_LIPSTICK_STRENGTH = 0.8f
+        private const val LIPSTICK_STRENGTH_PROGRESS_MAX = 50
+        private const val DEFAULT_LIPSTICK_STRENGTH = 0f
         private const val BLUR_STRENGTH_MIN = 0f
         private const val BLUR_STRENGTH_MAX = 1f
         private const val BLUR_STRENGTH_STEP = 0.01f

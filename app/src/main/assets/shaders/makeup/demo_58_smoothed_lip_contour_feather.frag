@@ -1,6 +1,6 @@
 precision mediump float;
 uniform sampler2D inputImageTexture;
-// 口红滑条控制目标色混入原图的强度，范围由 Android 端限制为 0.00--1.00。
+// 口红滑条控制目标色混入原图的强度，范围由 Android 端限制为 0.00--0.50。
 uniform float lipstickStrength;
 varying vec2 textureCoordinate;
 
@@ -109,7 +109,7 @@ void main() {
     // 得到带柔和边缘的最终嘴唇权重。
     float softLipWeight = lipWeight * fade;
     // 再次限制外部参数，避免异常值让颜色混合超出预期。
-    float safeLipstickStrength = clamp(lipstickStrength, 0.0, 1.0);
+    float safeLipstickStrength = clamp(lipstickStrength, 0.0, 0.5);
     // 使用羽化后的权重控制口红混色。
     vec3 resultColor = mix(sourceColor.rgb, lipstickColor, softLipWeight * safeLipstickStrength);
     // 显示羽化后的遮罩：白色染色，黑色不染色，灰色部分染色。
