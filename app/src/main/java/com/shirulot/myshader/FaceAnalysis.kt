@@ -31,6 +31,13 @@ object FaceAnalysis {
     private val LEFT_EYE_BOUNDARY_INDICES = intArrayOf(33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246)
     private val RIGHT_EYE_BOUNDARY_INDICES = intArrayOf(263, 249, 390, 373, 374, 380, 381, 382, 362, 398, 384, 385, 386, 387, 388, 466)
 
+    // 根据 MediaPipe 网格位置选择脸颊中心及其相邻点，仍沿用画面左/右命名。
+    // 这是用于腮红椭圆的区域定义，不是 SDK 直接输出的标准腮红范围。
+    private const val LEFT_BLUSH_CENTER_INDEX = 50
+    private const val RIGHT_BLUSH_CENTER_INDEX = 280
+    private val LEFT_BLUSH_BOUNDARY_INDICES = intArrayOf(118, 187, 101, 123)
+    private val RIGHT_BLUSH_BOUNDARY_INDICES = intArrayOf(347, 411, 330, 352)
+
     // 外嘴唇轮廓关键点。
     private val LIP_BOUNDARY_INDICES = intArrayOf(61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185)
 
@@ -101,6 +108,15 @@ object FaceAnalysis {
         val centers = calculateEyeCenters(landmarks)
         val left = calculateFeatureRegion(landmarks, centers.first, LEFT_EYE_BOUNDARY_INDICES)
         val right = calculateFeatureRegion(landmarks, centers.second, RIGHT_EYE_BOUNDARY_INDICES)
+        return left to right
+    }
+
+    /** 用检测到的脸颊中心和周围点计算腮红区域，不再依赖人脸框的固定百分比。 */
+    fun calculateBlushRegions(landmarks: FloatArray): Pair<FaceFeatureRegion, FaceFeatureRegion> {
+        require(hasValidLandmarks(landmarks)) { "脸颊关键点数据无效" }
+        // 中心随检测点移动，半径由相邻点的实际 UV 偏移计算，并复用最小半径保护。
+        val left = calculateFeatureRegion(landmarks, getPoint(landmarks, LEFT_BLUSH_CENTER_INDEX), LEFT_BLUSH_BOUNDARY_INDICES)
+        val right = calculateFeatureRegion(landmarks, getPoint(landmarks, RIGHT_BLUSH_CENTER_INDEX), RIGHT_BLUSH_BOUNDARY_INDICES)
         return left to right
     }
 

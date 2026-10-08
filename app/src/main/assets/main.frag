@@ -10,6 +10,10 @@ uniform float bigEyeStrength;
 uniform float slimFaceStrength;
 // 口红滑条控制目标色混入原图的强度，范围由 Android 端限制为 0.00--0.50。
 uniform float lipstickStrength;
+// 独立腮红滑条控制混色强度，范围为 0.00--0.30。
+uniform float blushStrength;
+// 独立范围滑条控制满权重区域的大小，数值越大着色区域越大。
+uniform float blushRange;
 varying vec2 textureCoordinate;
 
 // SDK 眼部轮廓计算出的原始半径。
@@ -58,15 +62,21 @@ float eyeYRatio = 4.5;
 uniform vec2 lipCenter;
 uniform vec2 lipRadius;
 
+const int LIP_POINT_COUNT = 40;
 // 沿外唇边界依次排列的 20 个关键点。
-uniform vec2 smoothOuterLipPoints[40];
-uniform vec2 smoothInnerLipPoints[40];
+uniform vec2 smoothOuterLipPoints[LIP_POINT_COUNT];
+uniform vec2 smoothInnerLipPoints[LIP_POINT_COUNT];
 
 // 选择一个固定的口红目标色。
 vec3 lipstickColor = vec3(0.78, 0.06, 0.16);
 
 // 从边界向嘴唇内部逐渐增强，宽度暂用 UV 单位。
 float featherWidth = 0.001;
+// Android 根据 SDK 关键点计算的画面左侧腮红区域。
+uniform vec2 leftBlushCenter;
+uniform vec2 leftBlushRadius;
+uniform vec2 rightBlushCenter;
+uniform vec2 rightBlushRadius;
 
 float getHue(vec3 color);
 float getSaturation(vec3 color);
@@ -145,14 +155,14 @@ float insideUv(vec2 value){
 float getSegmentDistance(vec2 p, vec2 a, vec2 b);
 
 // 当前UV坐标向单一方向延长后看会和边界的两点相邻的支线相交多少次 如果奇数次则代表在内 否则在外
-vec2 getPolygonInfo(vec2 uv, vec2 lipPoints[40]) {
+vec2 getPolygonInfo(vec2 uv, vec2 lipPoints[LIP_POINT_COUNT]) {
     // 从当前像素向右发射射线，每穿过一次边界就切换内外状态。
     float inside = 0.0;
     // UV 范围内的距离小于 2，先用较大值初始化。
     float minDistance = 2.0;
     // 从最后一个点开始，让第一条边连接最后一点与第一点。
-    vec2 a = lipPoints[39];
-    for (int i = 0; i < 40; i++) {
+    vec2 a = lipPoints[LIP_POINT_COUNT - 1];
+    for (int i = 0; i < LIP_POINT_COUNT; i++) {
         vec2 b = lipPoints[i];
         // 每条边都计算距离，保留最小值。
         float edgeDistance = getSegmentDistance(uv, a, b);
@@ -206,41 +216,33 @@ float getSegmentDistance(vec2 p, vec2 a, vec2 b) {
     return length(p - q);
 }
 
-void main() {
-    vec2 uv = textureCoordinate;
-    // 读取原图 alpha，保持 inputImageTexture 处于实际使用状态。
-    vec4 sourceColor = texture2D(inputImageTexture, uv);
-
-    // 用宽松包围盒筛掉远离嘴唇的像素，留出曲线插值的余量。
-    vec2 lipBounds = lipRadius * 1.5;
-    vec2 lipDelta = abs(uv - lipCenter);
-    // 当前显示黑白遮罩，区域外直接输出黑色。
-    if (faceCenterReady < 0.5 || lipDelta.x > lipBounds.x || lipDelta.y > lipBounds.y) {
-        gl_FragColor = sourceColor;
-        return;
+float getBlushWeight(vec2 uv, vec2 center, vec2 radius){
+    radius = max(radius, vec2(0.001));
+    // 计算归一化的椭圆距离。当前uv坐标距离圆心有几个半径的距离 如果大于半径则会大于1 所以这里最后要取反
+    float blushDistance = length((uv - center) / radius);
+    // 满权重区域范围限制在 0.40 到 1.00，保留关键点计算出的外边界。
+    float safeBlushRange = clamp(blushRange, 0.4, 1.0);
+    // 最大范围时覆盖完整椭圆，避免 smoothstep 的两个边界相等。
+    if (safeBlushRange >= 1.0) {
+        return (1.0 - step(1.0, blushDistance)) * faceCenterReady;
     }
+    // 数值越大，淡出起点越靠外，明显着色区域随之扩大。
+    float fadeStart = safeBlushRange;
+    float blushWeight = (1.0 - smoothstep(fadeStart, 1.0, blushDistance)) * faceCenterReady;
+    return blushWeight;
+}
 
-    // 分别计算外唇和内嘴的内外状态、边界距离。
-    vec2 outerInfo = getPolygonInfo(uv, smoothOuterLipPoints);
-    vec2 innerInfo = getPolygonInfo(uv, smoothInnerLipPoints);
-
-    // 外唇以内、内嘴以外，才是需要染色的区域。
-    float lipWeight = outerInfo.x * (1.0 - innerInfo.x) * faceCenterReady;
-
-    // 取距离较近的边界，让内外两圈边缘都参与羽化。
-    float boundaryDistance = min(outerInfo.y, innerInfo.y);
-
-    // 从边界向嘴唇内部逐渐增强，宽度暂用 UV 单位。
-    float fade = smoothstep(0.0, featherWidth, boundaryDistance);
-
-    // 得到带柔和边缘的最终嘴唇权重。
-    float softLipWeight = lipWeight * fade;
-    // 再次限制外部参数，避免异常值让颜色混合超出预期。
-    float safeLipstickStrength = clamp(lipstickStrength, 0.0, 0.5);
-    // 使用羽化后的权重控制口红混色。
-    vec3 resultColor = mix(sourceColor.rgb, lipstickColor, softLipWeight * safeLipstickStrength);
-    // 显示羽化后的遮罩：白色染色，黑色不染色，灰色部分染色。
-    gl_FragColor = vec4(resultColor, sourceColor.a);
+void main() {
+    vec2 UV = textureCoordinate;
+    // 读取原图 alpha，保持 inputImageTexture 处于实际使用状态。
+    vec4 sourceColor = texture2D(inputImageTexture, UV);
+    // 按眼部中心和半径，计算归一化椭圆距离。计算当前到左眼中心的距离 / 左眼半径 = 距离中心点有几个宽高  并且得到长度权重
+    float eyeDistance = length((UV - leftEyeCenter) / max(leftEyeRadius, vec2(0.001)));
+    // 椭圆内部为 1，外部为 0；没有有效人脸时关闭。长度权重查看是否在眼外 是的话取反 得0 眼内 取反得1
+    float eyeWeight = (1.0 - step(1.0, eyeDistance)) * faceCenterReady;
+    // 用半透明白色显示遮罩，方便对照原图；0.5 仅用于调试显示。
+    vec3 previewColor = mix(sourceColor.rgb, vec3(1.0), eyeWeight * 0.5);
+    gl_FragColor = vec4(previewColor, sourceColor.a);
 }
 
 // 详细查看 [res/drawable/hue_color_ring.png]

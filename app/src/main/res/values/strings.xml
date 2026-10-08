@@ -30,6 +30,10 @@
     <string name="shader_demo_slim_face_strength_content_description">瘦脸强度，范围 0.00 到 0.05，步长 0.005</string>
     <string name="shader_demo_lipstick_strength_label">口红：%1$.2f</string>
     <string name="shader_demo_lipstick_strength_content_description">口红强度，范围 0.00 到 0.50，步长 0.01</string>
+    <string name="shader_demo_blush_strength_label">腮红强度：%1$.2f</string>
+    <string name="shader_demo_blush_strength_content_description">腮红强度，范围 0.00 到 0.30，步长 0.01</string>
+    <string name="shader_demo_blush_range_label">腮红范围：%1$.2f</string>
+    <string name="shader_demo_blush_range_content_description">腮红着色范围，数值越大着色区域越大，范围 0.40 到 1.00，步长 0.01</string>
     <string name="shader_demo_blur_strength_label">磨皮强度：%1$.2f</string>
     <string name="shader_demo_blur_strength_content_description">磨皮强度，范围 0.00 到 1.00</string>
     <string name="shader_demo_warmth_strength_label">暖色补正：%1$.2f</string>
@@ -49,7 +53,7 @@
     </plurals>
 
     <string name="demo_passthrough_title">原图直通</string>
-    <string name="demo_passthrough_description">用于继续编辑当前 main.frag；当前使用平滑后的外唇和内嘴轮廓计算口红遮罩，并在嘴唇包围盒外直接保留原图。口红滑条范围为 0.00 到 0.50，默认值为 0.00，步长为 0.01。</string>
+    <string name="demo_passthrough_description">用于继续编辑当前 main.frag，练习双侧腮红。腮红强度范围为 0.00 到 0.30，着色范围为 0.40 到 1.00，数值越大着色区域越大。默认强度为 0.00，范围为 0.40。</string>
     <string name="demo_01_title">Demo 1 · 固定红色</string>
     <string name="demo_01_description">保留原图透明度，将每个片元的 RGB 输出为红色。</string>
     <string name="demo_02_title">Demo 2 · UV 红绿渐变</string>
@@ -174,4 +178,6 @@
     <string name="demo_57_description">使用 SDK 外唇和内嘴各 20 个轮廓点判断区域，并按到内外边界的距离羽化，再混合固定口红色；口红滑条范围为 0.00 到 0.50，默认值为 0.00，步长为 0.01。</string>
     <string name="demo_58_title">Demo 58 · 平滑唇形轮廓与边界羽化</string>
     <string name="demo_58_description">将 SDK 外唇和内嘴各 20 个点经 Android 端曲线插值扩为 40 点；Shader 用嘴唇包围盒保护外部像素，再按多边形边界羽化混合固定口红色。口红滑条范围为 0.00 到 0.50，默认值为 0.00，步长为 0.01。</string>
+    <string name="demo_59_title">Demo 59 · 关键点驱动的双侧腮红渐变</string>
+    <string name="demo_59_description">根据脸颊关键点计算左右腮红椭圆中心和半径，并在 Shader 中合并两侧渐变权重。腮红强度范围为 0.00 到 0.30，默认值为 0.00；渐变范围为 0.40 到 1.00，默认值为 0.40。当前复用固定预览色。</string>
 </resources>

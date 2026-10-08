@@ -30,6 +30,14 @@ data class ShaderDemo(
     val showWarmthStrengthControl: Boolean = false,
     // 饱和度滑条控制 Shader 的 saturationStrength uniform。
     val showSaturationStrengthControl: Boolean = false,
+    // 腮红默认关闭；与口红强度分别保存和控制。
+    val initialBlushStrength: Float = 0f,
+    // 仅实际使用 blushStrength 的 Demo 展示腮红滑条。
+    val showBlushStrengthControl: Boolean = false,
+    // 腮红范围控制满权重的着色区域，数值越大区域越大；关键点半径保持不变。
+    val initialBlushRange: Float = 0.4f,
+    // 腮红范围与颜色强度使用独立的控制开关。
+    val showBlushRangeControl: Boolean = false,
 )
 
 /** 一组可展开/收起的 Shader Demo。 */
@@ -42,13 +50,15 @@ data class ShaderDemoGroup(
 /** 集中维护 Demo 顺序，避免首页和渲染页各自保存一份映射。 */
 object ShaderDemoCatalog {
     val standaloneItems: List<ShaderDemo> = listOf(
-        // 当前 main.frag 的最终输出使用 lipstickStrength 控制嘴唇混色，因此只展示口红滑条。
+        // 当前 main.frag 练习双侧腮红渐变，分别控制腮红强度和着色范围。
         ShaderDemo(
             R.string.demo_passthrough_title,
             R.string.demo_passthrough_description,
             "main.frag",
-            initialLipstickStrength = 0f,
-            showLipstickStrengthControl = true,
+            initialBlushStrength = 0f,
+            showBlushStrengthControl = true,
+            initialBlushRange = 0.4f,
+            showBlushRangeControl = true,
         ),
     )
 
@@ -256,6 +266,16 @@ object ShaderDemoCatalog {
                     "shaders/makeup/demo_58_smoothed_lip_contour_feather.frag",
                     initialLipstickStrength = 0f,
                     showLipstickStrengthControl = true,
+                ),
+                // Demo 59 将当前 main.frag 的双侧关键点腮红练习保存为独立 Shader。
+                ShaderDemo(
+                    R.string.demo_59_title,
+                    R.string.demo_59_description,
+                    "shaders/makeup/demo_59_landmark_dual_cheek_blush_gradient.frag",
+                    initialBlushStrength = 0f,
+                    showBlushStrengthControl = true,
+                    initialBlushRange = 0.4f,
+                    showBlushRangeControl = true,
                 ),
             ),
             initiallyExpanded = false,

@@ -19,6 +19,7 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 /**
  * 独立的 Shader 练习页：只负责把 OpenGL Surface 和少量状态文字放到屏幕上。
@@ -72,6 +73,16 @@ class ShaderDemoActivity : ComponentActivity() {
             EXTRA_INITIAL_LIPSTICK_STRENGTH,
             DEFAULT_LIPSTICK_STRENGTH,
         )
+        // 腮红使用独立参数，避免与口红强度共用状态。
+        val initialBlushStrength = intent.getFloatExtra(
+            EXTRA_INITIAL_BLUSH_STRENGTH,
+            DEFAULT_BLUSH_STRENGTH,
+        ).coerceIn(BLUSH_STRENGTH_MIN, BLUSH_STRENGTH_MAX)
+        // 范围保存满权重区域的大小，与腮红颜色强度分别调节。
+        val initialBlushRange = intent.getFloatExtra(
+            EXTRA_INITIAL_BLUSH_RANGE,
+            DEFAULT_BLUSH_RANGE,
+        ).coerceIn(BLUSH_RANGE_MIN, BLUSH_RANGE_MAX)
         val showWhitenStrengthControl = intent.getBooleanExtra(
             EXTRA_SHOW_WHITEN_STRENGTH_CONTROL,
             false,
@@ -95,6 +106,14 @@ class ShaderDemoActivity : ComponentActivity() {
         )
         val showLipstickStrengthControl = intent.getBooleanExtra(
             EXTRA_SHOW_LIPSTICK_STRENGTH_CONTROL,
+            false,
+        )
+        val showBlushStrengthControl = intent.getBooleanExtra(
+            EXTRA_SHOW_BLUSH_STRENGTH_CONTROL,
+            false,
+        )
+        val showBlushRangeControl = intent.getBooleanExtra(
+            EXTRA_SHOW_BLUSH_RANGE_CONTROL,
             false,
         )
         val showBlurStrengthControl = intent.getBooleanExtra(
@@ -125,6 +144,10 @@ class ShaderDemoActivity : ComponentActivity() {
         shaderSurfaceView.setBigEyeStrength(initialBigEyeStrength)
         shaderSurfaceView.setSlimFaceStrength(initialSlimFaceStrength)
         shaderSurfaceView.setLipstickStrength(initialLipstickStrength)
+        // 独立初始化腮红；默认 0.00 时保持原图。
+        shaderSurfaceView.setBlushStrength(initialBlushStrength)
+        // 默认满权重区域延伸到归一化距离 0.40。
+        shaderSurfaceView.setBlushRange(initialBlushRange)
         shaderSurfaceView.setBlurStrength(DEFAULT_BLUR_STRENGTH)
         shaderSurfaceView.setSaturationStrength(DEFAULT_SATURATION_STRENGTH)
 
@@ -193,6 +216,14 @@ class ShaderDemoActivity : ComponentActivity() {
             }
             if (showLipstickStrengthControl) {
                 addLipstickStrengthControl(this, initialLipstickStrength)
+            }
+            // 按当前 Demo 配置展示腮红控件，其他 Demo 默认隐藏。
+            if (showBlushStrengthControl) {
+                addBlushStrengthControl(this, initialBlushStrength)
+            }
+            // 范围控件调节满权重区域大小，独立于颜色强度。
+            if (showBlushRangeControl) {
+                addBlushRangeControl(this, initialBlushRange)
             }
             if (showBlurStrengthControl) {
                 addBlurStrengthControl(this)
@@ -344,14 +375,17 @@ class ShaderDemoActivity : ComponentActivity() {
                 }
                 val face = FaceAnalysis.calculateFaceRegion(landmarks)
                 val eyes = FaceAnalysis.calculateEyeRegions(landmarks)
+                // 将真实脸颊点转换为左右腮红中心和半径，和其他区域一起提交给 GL 线程。
+                val blush = FaceAnalysis.calculateBlushRegions(landmarks)
                 val lip = FaceAnalysis.calculateLipRegion(landmarks)
                 val innerLip = FaceAnalysis.calculateInnerLipRegion(landmarks)
                 // 保留完整边界点，供 Shader 表现唇峰和内嘴形状。
                 val lipContours = FaceAnalysis.calculateLipContours(landmarks)
                 val slimPairs = FaceAnalysis.calculateSlimFacePairs(landmarks)
-                shaderSurfaceView.setFaceAnalysis(face, eyes, lip, innerLip, slimPairs, lipContours)
+                shaderSurfaceView.setFaceAnalysis(face, eyes, lip, innerLip, slimPairs, lipContours, blush)
                 Log.i("FaceAnalysis", "image=$imageName, pointCount=${landmarks.size / 2}, center=$face")
                 Log.i("FaceAnalysis", "leftEye=${eyes.first}, rightEye=${eyes.second}, lipRegion=$lip, innerLipRegion=$innerLip")
+                Log.i("FaceAnalysis", "leftBlush=${blush.first}, rightBlush=${blush.second}")
                 slimPairs.forEachIndexed { index, pair ->
                     Log.i("FaceAnalysis", "slimPair[$index]=${pair.origin} -> ${pair.target}")
                 }
@@ -665,6 +699,86 @@ class ShaderDemoActivity : ComponentActivity() {
         )
     }
 
+    /** 独立腮红滑条只更新 blushStrength，文字和无障碍说明使用资源。 */
+    private fun addBlushStrengthControl(panel: LinearLayout, initialValue: Float) {
+        val strengthText = TextView(this).apply {
+            setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
+            textSize = 13f
+            text = getString(R.string.shader_demo_blush_strength_label, initialValue)
+        }
+        val strengthSeekBar = SeekBar(this).apply {
+            max = BLUSH_STRENGTH_PROGRESS_MAX
+            progress = blushStrengthToProgress(initialValue)
+            contentDescription = getString(R.string.shader_demo_blush_strength_content_description)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                    val value = blushStrengthFromProgress(progress)
+                    strengthText.text = getString(R.string.shader_demo_blush_strength_label, value)
+                    // 经 GL 队列更新独立腮红强度，避免在 UI 线程操作渲染状态。
+                    shaderSurfaceView.setBlushStrength(value)
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
+
+                override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
+            })
+        }
+        panel.addView(
+            strengthText,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(8) },
+        )
+        panel.addView(
+            strengthSeekBar,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+    }
+
+    /** 腮红范围控制满权重区域大小；数值越大，明显着色区域越大。 */
+    private fun addBlushRangeControl(panel: LinearLayout, initialValue: Float) {
+        val rangeText = TextView(this).apply {
+            setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
+            textSize = 13f
+            text = getString(R.string.shader_demo_blush_range_label, initialValue)
+        }
+        val rangeSeekBar = SeekBar(this).apply {
+            max = BLUSH_RANGE_PROGRESS_MAX
+            progress = blushRangeToProgress(initialValue)
+            contentDescription = getString(R.string.shader_demo_blush_range_content_description)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                    val value = blushRangeFromProgress(progress)
+                    rangeText.text = getString(R.string.shader_demo_blush_range_label, value)
+                    // 通过 GL 队列直接传递范围值，Shader 按同一方向扩大着色区域。
+                    shaderSurfaceView.setBlushRange(value)
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
+
+                override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
+            })
+        }
+        panel.addView(
+            rangeText,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(8) },
+        )
+        panel.addView(
+            rangeSeekBar,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+    }
+
     private fun addBlurStrengthControl(panel: LinearLayout) {
         val strengthText = TextView(this).apply {
             setTextColor(ContextCompat.getColor(this@ShaderDemoActivity, R.color.shader_demo_text))
@@ -835,6 +949,24 @@ class ShaderDemoActivity : ComponentActivity() {
         (SLIM_FACE_STRENGTH_MIN + progress * SLIM_FACE_STRENGTH_STEP)
             .coerceAtMost(SLIM_FACE_STRENGTH_MAX)
 
+    /** 腮红滑条以 0.01 为步长，数值转换与口红独立维护。 */
+    private fun blushStrengthToProgress(value: Float): Int =
+        ((value.coerceIn(BLUSH_STRENGTH_MIN, BLUSH_STRENGTH_MAX) - BLUSH_STRENGTH_MIN) /
+                BLUSH_STRENGTH_STEP).toInt()
+
+    private fun blushStrengthFromProgress(progress: Int): Float =
+        (BLUSH_STRENGTH_MIN + progress * BLUSH_STRENGTH_STEP)
+            .coerceAtMost(BLUSH_STRENGTH_MAX)
+
+    /** 将腮红着色范围按 0.01 步长映射到独立滑条，四舍五入避免浮点误差少一格。 */
+    private fun blushRangeToProgress(value: Float): Int =
+        ((value.coerceIn(BLUSH_RANGE_MIN, BLUSH_RANGE_MAX) - BLUSH_RANGE_MIN) /
+                BLUSH_RANGE_STEP).roundToInt().coerceIn(0, BLUSH_RANGE_PROGRESS_MAX)
+
+    private fun blushRangeFromProgress(progress: Int): Float =
+        (BLUSH_RANGE_MIN + progress * BLUSH_RANGE_STEP)
+            .coerceAtMost(BLUSH_RANGE_MAX)
+
     private fun lipstickStrengthToProgress(value: Float): Int =
         ((value.coerceIn(LIPSTICK_STRENGTH_MIN, LIPSTICK_STRENGTH_MAX) - LIPSTICK_STRENGTH_MIN) /
                 LIPSTICK_STRENGTH_STEP).toInt()
@@ -852,12 +984,18 @@ class ShaderDemoActivity : ComponentActivity() {
         private const val EXTRA_INITIAL_BIG_EYE_STRENGTH = "initial_big_eye_strength"
         private const val EXTRA_INITIAL_SLIM_FACE_STRENGTH = "initial_slim_face_strength"
         private const val EXTRA_INITIAL_LIPSTICK_STRENGTH = "initial_lipstick_strength"
+        // 腮红使用独立 Intent 字段，入口与控件保持同一含义。
+        private const val EXTRA_INITIAL_BLUSH_STRENGTH = "initial_blush_strength"
+        // 着色范围与混色强度使用不同字段，避免含义混淆。
+        private const val EXTRA_INITIAL_BLUSH_RANGE = "initial_blush_range"
         private const val EXTRA_SHOW_WHITEN_STRENGTH_CONTROL = "show_whiten_strength_control"
         private const val EXTRA_SHOW_BRIGHTEN_STRENGTH_CONTROL = "show_brighten_strength_control"
         private const val EXTRA_SHOW_BLACK_CIRCLE_STRENGTH_CONTROL = "show_black_circle_strength_control"
         private const val EXTRA_SHOW_BIG_EYE_STRENGTH_CONTROL = "show_big_eye_strength_control"
         private const val EXTRA_SHOW_SLIM_FACE_STRENGTH_CONTROL = "show_slim_face_strength_control"
         private const val EXTRA_SHOW_LIPSTICK_STRENGTH_CONTROL = "show_lipstick_strength_control"
+        private const val EXTRA_SHOW_BLUSH_STRENGTH_CONTROL = "show_blush_strength_control"
+        private const val EXTRA_SHOW_BLUSH_RANGE_CONTROL = "show_blush_range_control"
         private const val EXTRA_SHOW_BLUR_STRENGTH_CONTROL = "show_blur_strength_control"
         private const val EXTRA_SHOW_WARMTH_STRENGTH_CONTROL = "show_warmth_strength_control"
         private const val EXTRA_SHOW_SATURATION_STRENGTH_CONTROL = "show_saturation_strength_control"
@@ -892,6 +1030,18 @@ class ShaderDemoActivity : ComponentActivity() {
         private const val LIPSTICK_STRENGTH_STEP = 0.01f
         private const val LIPSTICK_STRENGTH_PROGRESS_MAX = 50
         private const val DEFAULT_LIPSTICK_STRENGTH = 0f
+        // 腮红初始关闭，允许以 0.01 步长调节到 0.30。
+        private const val BLUSH_STRENGTH_MIN = 0f
+        private const val BLUSH_STRENGTH_MAX = 0.3f
+        private const val BLUSH_STRENGTH_STEP = 0.01f
+        private const val BLUSH_STRENGTH_PROGRESS_MAX = 30
+        private const val DEFAULT_BLUSH_STRENGTH = 0f
+        // 范围表示满权重区域的大小，默认最小值 0.40 对应淡出起点 0.40。
+        private const val BLUSH_RANGE_MIN = 0.4f
+        private const val BLUSH_RANGE_MAX = 1f
+        private const val BLUSH_RANGE_STEP = 0.01f
+        private const val BLUSH_RANGE_PROGRESS_MAX = 60
+        private const val DEFAULT_BLUSH_RANGE = 0.4f
         private const val BLUR_STRENGTH_MIN = 0f
         private const val BLUR_STRENGTH_MAX = 1f
         private const val BLUR_STRENGTH_STEP = 0.01f
@@ -933,6 +1083,12 @@ class ShaderDemoActivity : ComponentActivity() {
             showBlurStrengthControl: Boolean,
             showWarmthStrengthControl: Boolean,
             showSaturationStrengthControl: Boolean,
+            // 腮红独立配置；省略时不影响已有 Demo。
+            initialBlushStrength: Float = DEFAULT_BLUSH_STRENGTH,
+            showBlushStrengthControl: Boolean = false,
+            // 已有 Demo 默认不展示腮红范围控件。
+            initialBlushRange: Float = DEFAULT_BLUSH_RANGE,
+            showBlushRangeControl: Boolean = false,
         ): Intent = Intent(context, ShaderDemoActivity::class.java).apply {
             putExtra(EXTRA_FRAGMENT_SHADER_ASSET, fragmentShaderAsset)
             putExtra(EXTRA_DEMO_TITLE, demoTitle)
@@ -951,6 +1107,10 @@ class ShaderDemoActivity : ComponentActivity() {
             putExtra(EXTRA_SHOW_BLUR_STRENGTH_CONTROL, showBlurStrengthControl)
             putExtra(EXTRA_SHOW_WARMTH_STRENGTH_CONTROL, showWarmthStrengthControl)
             putExtra(EXTRA_SHOW_SATURATION_STRENGTH_CONTROL, showSaturationStrengthControl)
+            putExtra(EXTRA_INITIAL_BLUSH_STRENGTH, initialBlushStrength)
+            putExtra(EXTRA_SHOW_BLUSH_STRENGTH_CONTROL, showBlushStrengthControl)
+            putExtra(EXTRA_INITIAL_BLUSH_RANGE, initialBlushRange)
+            putExtra(EXTRA_SHOW_BLUSH_RANGE_CONTROL, showBlushRangeControl)
         }
     }
 }

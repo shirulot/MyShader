@@ -80,6 +80,16 @@ class ShaderSurfaceView(
         queueEvent { shaderRenderer.setLipstickStrength(value) }
     }
 
+    fun setBlushStrength(value: Float) {
+        // 腮红使用独立强度，并在 GL 线程更新，避免与口红滑条互相影响。
+        queueEvent { shaderRenderer.setBlushStrength(value) }
+    }
+
+    fun setBlushRange(value: Float) {
+        // 范围值表示满权重区域大小，单独传入 GL 线程，不与腮红强度共用。
+        queueEvent { shaderRenderer.setBlushRange(value) }
+    }
+
     fun setWarmthStrength(value: Float) {
         // SeekBar 回调来自主线程，uniform 状态必须在 GL 线程更新。
         queueEvent { shaderRenderer.setWarmthStrength(value) }
@@ -112,6 +122,7 @@ class ShaderSurfaceView(
         innerLip: FaceFeatureRegion,
         slimPairs: List<FaceWarpPair>,
         lipContours: Pair<FloatArray, FloatArray>,
+        blush: Pair<FaceFeatureRegion, FaceFeatureRegion>,
     ) {
         queueEvent {
             shaderRenderer.clearFaceAnalysis()
@@ -120,6 +131,8 @@ class ShaderSurfaceView(
             shaderRenderer.setLipRegions(lip)
             shaderRenderer.setInnerLipRegions(innerLip)
             shaderRenderer.setLipContours(lipContours)
+            // 腮红区域也随同一组检测结果提交，再启用人脸效果。
+            shaderRenderer.setBlushRegions(blush.first, blush.second)
             shaderRenderer.setFaceCenter(face.centerX, face.centerY, face.width, face.height)
         }
     }
@@ -168,6 +181,9 @@ private class ShaderRenderer(
     private var rightEyeRegion = FaceFeatureRegion(FacePoint(0.65f, 0.41f), FacePoint(0.062f, 0.016f))
     private var lipRegion = FaceFeatureRegion(FacePoint(0.50f, 0.62f), FacePoint(0.112f, 0.029f))
     private var innerLipRegion = FaceFeatureRegion(FacePoint(0.50f, 0.62f), FacePoint(0.04f, 0.012f))
+    // 左右按画面方向命名；检测前使用安全半径，并由 faceCenterReady 关闭效果。
+    private var leftBlushRegion = FaceFeatureRegion(FacePoint(0f, 0f), FacePoint(0.001f, 0.001f))
+    private var rightBlushRegion = FaceFeatureRegion(FacePoint(0f, 0f), FacePoint(0.001f, 0.001f))
     // 两条闭合轮廓各包含 20 个点，未检测时由 faceCenterReady 关闭效果。
     private val outerLipPoints = FloatArray(40)
     private val innerLipPoints = FloatArray(40)
@@ -206,6 +222,10 @@ private class ShaderRenderer(
     private var bigEyeStrength = DEFAULT_BIG_EYE_STRENGTH
     private var slimFaceStrength = DEFAULT_SLIM_FACE_STRENGTH
     private var lipstickStrength = DEFAULT_LIPSTICK_STRENGTH
+    // 腮红默认关闭，其强度与口红独立保存。
+    private var blushStrength = DEFAULT_BLUSH_STRENGTH
+    // 数值越大，满权重区域和可见着色向外扩展，不改变 SDK 关键点计算的半径。
+    private var blushRange = DEFAULT_BLUSH_RANGE
 
     private var warmthStrength = DEFAULT_WARMTH_STRENGTH
     private var saturationStrength = DEFAULT_SATURATION_STRENGTH
@@ -272,6 +292,10 @@ private class ShaderRenderer(
         val bigEyeStrengthLocation = GLES20.glGetUniformLocation(program, "bigEyeStrength")
         val slimFaceStrengthLocation = GLES20.glGetUniformLocation(program, "slimFaceStrength")
         val lipstickStrengthLocation = GLES20.glGetUniformLocation(program, "lipstickStrength")
+        // 旧 Demo 未声明腮红强度时返回 -1，后续跳过上传。
+        val blushStrengthLocation = GLES20.glGetUniformLocation(program, "blushStrength")
+        // 满权重区域大小使用独立接口，旧 Demo 未声明时安全跳过。
+        val blushRangeLocation = GLES20.glGetUniformLocation(program, "blushRange")
         val blurStrengthLocation = GLES20.glGetUniformLocation(program, "blurStrength")
         val warmthStrengthLocation = GLES20.glGetUniformLocation(program, "warmthStrength")
         val saturationStrengthLocation = GLES20.glGetUniformLocation(program, "saturationStrength")
@@ -289,6 +313,11 @@ private class ShaderRenderer(
         val lipRadiusLocation = GLES20.glGetUniformLocation(program, "lipRadius")
         val innerLipCenterLocation = GLES20.glGetUniformLocation(program, "innerLipCenter")
         val innerLipRadiusLocation = GLES20.glGetUniformLocation(program, "innerLipRadius")
+        // 新腮红接口保持可选，未声明这些参数的旧 Demo 无需改动。
+        val leftBlushCenterLocation = GLES20.glGetUniformLocation(program, "leftBlushCenter")
+        val leftBlushRadiusLocation = GLES20.glGetUniformLocation(program, "leftBlushRadius")
+        val rightBlushCenterLocation = GLES20.glGetUniformLocation(program, "rightBlushCenter")
+        val rightBlushRadiusLocation = GLES20.glGetUniformLocation(program, "rightBlushRadius")
         // 数组从首元素查询；旧 Shader 未声明时返回 -1，跳过上传。
         val outerLipPointsLocation = GLES20.glGetUniformLocation(program, "outerLipPoints[0]")
         val innerLipPointsLocation = GLES20.glGetUniformLocation(program, "innerLipPoints[0]")
@@ -354,6 +383,14 @@ private class ShaderRenderer(
         if (lipstickStrengthLocation >= 0) {
             GLES20.glUniform1f(lipstickStrengthLocation, lipstickStrength)
         }
+        // 只向实际使用 blushStrength 的 Shader 上传独立腮红强度。
+        if (blushStrengthLocation >= 0) {
+            GLES20.glUniform1f(blushStrengthLocation, blushStrength)
+        }
+        // 范围滑条上传满权重区域边界，保留检测得到的中心和半径。
+        if (blushRangeLocation >= 0) {
+            GLES20.glUniform1f(blushRangeLocation, blushRange)
+        }
         // 只有磨皮声明 blurStrength；其他 Shader 返回 -1，保持原有行为。
         if (blurStrengthLocation >= 0) {
             GLES20.glUniform1f(blurStrengthLocation, blurStrength)
@@ -380,6 +417,19 @@ private class ShaderRenderer(
         if (lipCenterLocation >= 0) GLES20.glUniform2f(lipCenterLocation, lipRegion.center.x, lipRegion.center.y)
         if (innerLipRadiusLocation >= 0) GLES20.glUniform2f(innerLipRadiusLocation, innerLipRegion.radius.x, innerLipRegion.radius.y)
         if (innerLipCenterLocation >= 0) GLES20.glUniform2f(innerLipCenterLocation, innerLipRegion.center.x, innerLipRegion.center.y)
+        // 腮红只接收本图检测得到的中心和范围，具体渐变仍在 Shader 中计算。
+        if (leftBlushCenterLocation >= 0) {
+            GLES20.glUniform2f(leftBlushCenterLocation, leftBlushRegion.center.x, leftBlushRegion.center.y)
+        }
+        if (leftBlushRadiusLocation >= 0) {
+            GLES20.glUniform2f(leftBlushRadiusLocation, leftBlushRegion.radius.x, leftBlushRegion.radius.y)
+        }
+        if (rightBlushCenterLocation >= 0) {
+            GLES20.glUniform2f(rightBlushCenterLocation, rightBlushRegion.center.x, rightBlushRegion.center.y)
+        }
+        if (rightBlushRadiusLocation >= 0) {
+            GLES20.glUniform2f(rightBlushRadiusLocation, rightBlushRegion.radius.x, rightBlushRegion.radius.y)
+        }
         // 每个点使用原检测 UV，不再压缩成椭圆中心和半径。
         if (outerLipPointsLocation >= 0) GLES20.glUniform2fv(outerLipPointsLocation, 20, outerLipPoints, 0)
         if (innerLipPointsLocation >= 0) GLES20.glUniform2fv(innerLipPointsLocation, 20, innerLipPoints, 0)
@@ -457,6 +507,16 @@ private class ShaderRenderer(
 
     fun setLipstickStrength(value: Float) {
         lipstickStrength = value.coerceIn(MIN_LIPSTICK_STRENGTH, MAX_LIPSTICK_STRENGTH)
+    }
+
+    fun setBlushStrength(value: Float) {
+        // 限制腮红混色强度，和页面滑条的有效范围保持一致。
+        blushStrength = value.coerceIn(MIN_BLUSH_STRENGTH, MAX_BLUSH_STRENGTH)
+    }
+
+    fun setBlushRange(value: Float) {
+        // 满权重区域大小限制在 0.40 到 1.00，独立于颜色混合强度。
+        blushRange = value.coerceIn(MIN_BLUSH_RANGE, MAX_BLUSH_RANGE)
     }
 
     fun setWarmthStrength(value: Float) {
@@ -646,6 +706,12 @@ private class ShaderRenderer(
         this.innerLipRegion = innerLipRegion
     }
 
+    /** 同一张图片的两侧腮红参数只在 GL 线程成组保存。 */
+    fun setBlushRegions(leftBlushRegion: FaceFeatureRegion, rightBlushRegion: FaceFeatureRegion) {
+        this.leftBlushRegion = leftBlushRegion
+        this.rightBlushRegion = rightBlushRegion
+    }
+
     /** 在同一次 GL 更新中保存两条轮廓，避免与当前图片的人脸数据错配。 */
     fun setLipContours(contours: Pair<FloatArray, FloatArray>) {
         require(contours.first.size == outerLipPoints.size && contours.second.size == innerLipPoints.size)
@@ -680,6 +746,14 @@ private class ShaderRenderer(
         const val DEFAULT_LIPSTICK_STRENGTH = 0f
         const val MIN_LIPSTICK_STRENGTH = 0f
         const val MAX_LIPSTICK_STRENGTH = 0.5f
+        // 腮红强度的默认值和边界单独维护，便于后续独立调整。
+        const val DEFAULT_BLUSH_STRENGTH = 0f
+        const val MIN_BLUSH_STRENGTH = 0f
+        const val MAX_BLUSH_STRENGTH = 0.3f
+        // 默认满权重区域到归一化距离 0.40，Shader 从此处开始渐变淡出。
+        const val DEFAULT_BLUSH_RANGE = 0.4f
+        const val MIN_BLUSH_RANGE = 0.4f
+        const val MAX_BLUSH_RANGE = 1f
 
         const val DEFAULT_WARMTH_STRENGTH = 0f
         const val MIN_WARMTH_STRENGTH = 0f

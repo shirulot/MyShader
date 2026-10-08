@@ -43,6 +43,12 @@ class MainActivity : ComponentActivity() {
                     showBlurStrengthControl = demo.showBlurStrengthControl,
                     showWarmthStrengthControl = demo.showWarmthStrengthControl,
                     showSaturationStrengthControl = demo.showSaturationStrengthControl,
+                    // 腮红使用自己的初值和控件开关，不复用口红配置。
+                    initialBlushStrength = demo.initialBlushStrength,
+                    showBlushStrengthControl = demo.showBlushStrengthControl,
+                    // 着色范围单独传递，数值越大着色区域越大，关键点半径和颜色强度不变。
+                    initialBlushRange = demo.initialBlushRange,
+                    showBlushRangeControl = demo.showBlushRangeControl,
                 ),
             )
         }

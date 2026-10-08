@@ -7,9 +7,11 @@ varying vec2 textureCoordinate;
 // SDK 外唇轮廓计算出的中心和半径。
 uniform vec2 lipCenter;
 uniform vec2 lipRadius;
+// 与 Android 端平滑后的外唇、内嘴轮廓数组长度保持一致。
+const int LIP_POINT_COUNT = 40;
 // 沿外唇边界依次排列的 20 个关键点。
-uniform vec2 smoothOuterLipPoints[40];
-uniform vec2 smoothInnerLipPoints[40];
+uniform vec2 smoothOuterLipPoints[LIP_POINT_COUNT];
+uniform vec2 smoothInnerLipPoints[LIP_POINT_COUNT];
 
 // 选择一个固定的口红目标色。
 vec3 lipstickColor = vec3(0.78, 0.06, 0.16);
@@ -20,18 +22,18 @@ float featherWidth = 0.001;
 // 标记当前人脸框数据是否可用。
 uniform float faceCenterReady;
 
-// 前置声明：多边形计算会先调用后面定义的线段距离函数。
+// 提前声明后面的距离函数，供轮廓函数调用。
 float getSegmentDistance(vec2 p, vec2 a, vec2 b);
 
 // 当前UV坐标向单一方向延长后看会和边界的两点相邻的支线相交多少次 如果奇数次则代表在内 否则在外
-vec2 getPolygonInfo(vec2 uv, vec2 lipPoints[40]) {
+vec2 getPolygonInfo(vec2 uv, vec2 lipPoints[LIP_POINT_COUNT]) {
     // 从当前像素向右发射射线，每穿过一次边界就切换内外状态。
     float inside = 0.0;
     // UV 范围内的距离小于 2，先用较大值初始化。
     float minDistance = 2.0;
     // 从最后一个点开始，让第一条边连接最后一点与第一点。
-    vec2 a = lipPoints[lipPoints.length() - 1];
-    for (int i = 0; i < lipPoints.length(); i++) {
+    vec2 a = lipPoints[LIP_POINT_COUNT - 1];
+    for (int i = 0; i < LIP_POINT_COUNT; i++) {
         vec2 b = lipPoints[i];
         // 每条边都计算距离，保留最小值。
         float edgeDistance = getSegmentDistance(uv, a, b);
@@ -71,7 +73,12 @@ float getSegmentDistance(vec2 p, vec2 a, vec2 b) {
     //    // AQ 占整条 AB 的比例
     //    float t = aq / max(abLength, 0.00000001);
     // 投影得到最近位置的进度，并避免两个端点重合时除以零。
-    float t = dot(ap, ab) / max(dot(ab, ab), 0.00000001);
+    // 计算线段长度的平方。
+    float abLengthSquared = dot(ab, ab);
+    // 长度平方为零时按一个点处理，避免除零。
+    if (abLengthSquared <= 0.0) return length(ap);
+    // 使用原始平方长度计算投影比例。
+    float t = dot(ap, ab) / abLengthSquared;
     // 将位置限制在线段内部，避免落到延长线上。
     t = clamp(t, 0.0, 1.0);
     // 得到线段上最近的点Q = 垂足坐标
@@ -81,12 +88,14 @@ float getSegmentDistance(vec2 p, vec2 a, vec2 b) {
 }
 
 void main() {
+    vec2 uv = textureCoordinate;
     // 读取原图 alpha，保持 inputImageTexture 处于实际使用状态。
-    vec4 sourceColor = texture2D(inputImageTexture, textureCoordinate);
+    vec4 sourceColor = texture2D(inputImageTexture, uv);
+
 
     // 用宽松包围盒筛掉远离嘴唇的像素，留出曲线插值的余量。
     vec2 lipBounds = lipRadius * 1.5;
-    vec2 lipDelta = abs(textureCoordinate - lipCenter);
+    vec2 lipDelta = abs(uv - lipCenter);
     // 当前显示黑白遮罩，区域外直接输出黑色。
     if (faceCenterReady < 0.5 || lipDelta.x > lipBounds.x || lipDelta.y > lipBounds.y) {
         gl_FragColor = sourceColor;
@@ -94,8 +103,8 @@ void main() {
     }
 
     // 分别计算外唇和内嘴的内外状态、边界距离。
-    vec2 outerInfo = getPolygonInfo(textureCoordinate, smoothOuterLipPoints);
-    vec2 innerInfo = getPolygonInfo(textureCoordinate, smoothInnerLipPoints);
+    vec2 outerInfo = getPolygonInfo(uv, smoothOuterLipPoints);
+    vec2 innerInfo = getPolygonInfo(uv, smoothInnerLipPoints);
 
     // 外唇以内、内嘴以外，才是需要染色的区域。
     float lipWeight = outerInfo.x * (1.0 - innerInfo.x) * faceCenterReady;
